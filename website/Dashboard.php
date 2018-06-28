@@ -327,8 +327,8 @@ error_log( "Php Errors!" );
 				height: 40px;
 			}
 			#M55 { /* Bandsaw */
-				bottom: 465px;
-				left: 200px;
+				bottom: 280px;
+				left: 450px;
 				width: 40px;
 				height: 40px;
 			}
@@ -398,12 +398,6 @@ error_log( "Php Errors!" );
 				width: 75px;
 				height: 75px;
 			}
-			#M68 { /* Resaw Bandsaw */
-				bottom: 280px;
-				left: 450px;
-				width: 40px;
-				height: 40px;
-			}
 		</style>
 	</head>
 	<body>
@@ -433,7 +427,6 @@ error_log( "Php Errors!" );
 				<div id="M65"><a>Test</a></div>
 				<div id="M66"><a>Sign In</a></div>
 				<div id="M67"><a>CNC Router</a></div>
-				<div id="M68"><a>ReSaw</a></div>
 			</div>
 			<div id="gridMachLog" class="AutoRefresh"></div>
 		</div>
