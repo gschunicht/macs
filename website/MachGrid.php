@@ -25,7 +25,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 		
 
 		<script id="UserMachine" type="text/x-kendo-template">
-				<tr data-uid="#= id # >
+				<tr data-uid="#= id #" >
 					<td class="k-command-cell">
 						<a class="k-button k-button-icontext k-grid-delete" >
 							<span class="k-icon k-i-delete"></span>
@@ -38,17 +38,38 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 		<script>
 			$(document).ready(function () {
 				setupMenu();
-				getMachDataSource();
-				makeMachGrid ();
+				var mach_id = "<?php if ($_GET["mach_id"]) {echo htmlspecialchars($_GET["mach_id"]);}else {echo "%"; }?>";
+				console.log("mach_id: " + mach_id);
+				getMachDataSource(mach_id);
 				getUserList();
 				findDataItem();
 				$("#btnAddMachAccess").kendoButton({
 					icon: "plus-circle",
-					click: function () {showMachLog();}
+					click: function () {
+						$.ajax({
+							url: "json_Access.php",
+							type: "PUT",
+							data:{
+								mach_id: $("#titleSelected").prop('title'), 
+								user_id: $("#UserList").val() 
+							},
+							success: function(result){ //the AJAX returns the updated user_id so we can update the displayed machines
+								showUserAccess ($("#titleSelected").prop('title'));//TODO: investigate returning the whole JSON dataset and binding results (saves a round trip)
+							}
+						});
+					}
 				});
+				
+				$("#btnClrFltr").kendoButton({
+					click: function () {
+						MachDataSource.filter({});//Clears ALL filters, not just ID column
+						$("#btnClrFltr").hide();
+					}
+				});
+				
 			});
 			
-			function getMachDataSource (){
+			function getMachDataSource (mach_id){
 				MachDataSource = new kendo.data.DataSource({
 					transport: {
 						read: {
@@ -70,22 +91,61 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 							type: "PUT"
 						}
 					},
+					schema: {
+                        model: {
+							id: "id",
+                            fields: {
+                                id: {
+									type: "string",
+									editable: false,
+									nullable: true		
+								},
+                                name: { type: "string",
+									editable: true,
+									nullable: true		
+								 },
+                                mach_nr: { type: "string",
+									editable: false,
+									nullable: true		
+								 },
+                                desc: { type: "string",
+									editable: false,
+									nullable: true		
+								 },
+                                last_seen: { type: "string",
+									editable: false,
+									nullable: true		
+								 },
+                                active: { type: "boolean",
+									editable: true,
+									nullable: true		
+								 },
+                                version: { type: "string",
+									editable: true,
+									nullable: true		
+								 }
+                            }
+                        }
+                    },
 					pageSize: 5
 				});	
+				makeMachGrid (mach_id);
+				if (mach_id) {
+					MachDataSource.filter({field:"id", operator: "eq", value: mach_id});
+					$("tr.k-filter-row th:nth-of-type(2)").html('<button type="button" class="k-button k-button-icon" id="btnClrFltr" aria-label="Clear"><span class="k-icon k-i-filter-clear"></span></button>')
+				}
 			}
 			
-			function makeMachGrid (){
+			function makeMachGrid (mach_id){
 				
-				 $("#gridMach").kendoGrid({
+				 var gridMach = $("#gridMach").kendoGrid({
 					//rowTemplate: kendo.template($("#template").html()),
 					dataSource: MachDataSource,
 					sortable: true,
 					//detailTemplate: kendo.template($("#template").html()),
 					editable:"inline",
 					selectable: "row",
-					filterable: {
-									mode: "row"
-								},
+					filterable: {mode: "row"},
 					resizable: false,
 					reorderable: true,
 					pageable: {
@@ -96,13 +156,17 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 					columns: [
 						{ command: [{name:"edit",text:""}], title: " ", width:10},
 						{
+						field: "id",
+						title: "ID",
+						filterable: false ,
+						width: 8
+					},{
 						field: "name",
 						title: "Machine Name",
 						width: 25
 					}, {
 						field: "desc",
 						title: "Description",
-						filterable: false ,
 						width: 20
 					}, {
 						field: "machine_nr",
@@ -131,10 +195,16 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						showMachAccess(selectedItem.id);
 						showMachLog(selectedItem.id);
 						titleSelected.innerHTML = " - " + selectedItem.name;
+						$("#titleSelected").prop('title',selectedItem.id); //set the title attribute of the selected machine to the mach_id - used as a temp variable for the adding of mahine access and for debugging (visible when hovering)
 						
 					}
 				});
-				$("[date-text-field='name'] ").focus();
+				if (mach_id) {
+					showMachAccess(mach_id);
+					showMachLog(mach_id);
+				} else {
+					$("[date-text-field='name'] ").focus();
+				}
 			}
 			
 			function showMachAccess (Mach_ID) {
@@ -144,6 +214,10 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 							url: "json_Access.php?mach_id=" + Mach_ID,	
 							dataType: "jsonp", // "jsonp" is required for cross-domain requests; use "json" for same-domain requests,
 							jsonpCallback: "Access"
+						},
+						destroy: {
+							url: "json_Access.php",	
+							type: "DELETE"
 						}
 					},
 					schema: {
@@ -164,22 +238,26 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						kendo.ui.progress($("#gridMachAccess"), false);
 					}
 				});	
+					//sort Grid's dataSource
+					MachAccessDataSource.sort({field: "machName", dir: "asc"});
 				
 				$("#gridMachAccess").kendoGrid({
 					dataSource: MachAccessDataSource,
 					width: 300,
 					sortable: true,
 					reorderable: true,
-					editable: true,
+					editable: { //disables the update functionality, only allows deletion
+						update: false,
+						mode: "inline",
+						destroy: true
+					},
 					//rowTemplate: kendo.template($("#UserMachine").html()),
 					columns: [
 						{command: [{name:"destroy",text:""}], title: " ", width:20},
 						{
 							field: "userName",
 							title: "User Name",
-							sortable: {
-								initialDirection: "asc"  
-							},
+							sortable: true,
 							width: 80
 						}
 						]
@@ -247,58 +325,20 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 			function getUserList(){  //TODO - get this list to populate the User selector
 		
 				$("#UserList").kendoDropDownList({
-							dataTextField: "name",
-							dataValueField: "id",
-							dataSource: {
-								transport: {
-									read: {
-										dataType: "jsonp",
-										url: "json_Users.php?active=1",
-										jsonpCallback: 'Users'
-									}
-								}
-							},
-							optionLabel: "Select User..."
-						});
+					dataTextField: "name",
+					dataValueField: "id",
+					dataSource: {
+						transport: {
+							read: {
+								dataType: "jsonp",
+								url: "json_Users.php?active=1",
+								jsonpCallback: 'Users'
+							}
+						}
+					},
+					optionLabel: "Select User..."
+				});
 			}
-			
-			function findDataItem() {
-				var theGrid = $("#gridMach").data("kendoGrid");
-				var dataItemID = 50;
-				//get grid datasource
-				var ds = theGrid.dataSource;
-				var view = kendo.data.Query.process(ds.data(), {
-								filter: ds.filter(),
-								sort: ds.sort()
-							})
-							.data;
-					
-				var index = -1;
-				for (var x = 0; x < view.length; x++) {
-					if (view[x].Id == dataItemID) {
-						index = x;
-						break;
-					}
-				}
-				
-				if (index === -1) {
-					return;
-				}
-				
-				var page = Math.floor(index / ds.pageSize());    
-				var targetIndex = index - (page * ds.pageSize()) + 1;    
-				//page is 1-based index    
-				ds.page(++page);
-				//grid wants a html element. tr:eq(x) by itself searches in the first grid!    
-				var row = $("#gridMach").find("tr:eq(" + targetIndex + ")");
-				theGrid.select(row);
-			   
-				console.log('Found it at Page: ' + page + 'index: ' + targetIndex);
-
-			}
-			
-			function addMachAccess (user_id, machine_id){}  //TODO - write function to add selected machine access permission
-			function removeMachAccess (id){}  //TODO - write function to remove selected machine access permission
 			
 		</script>
 	<style type="text/css">
@@ -310,7 +350,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 
 	button {
 		height:20px;
-		width:40px;
+		width:20px;
 		
 	}
 	#gridMachLog {
@@ -327,6 +367,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 	</style>
 	</head>
 <body>
+
 <div id="master" class="Content">
 	<div id="menu"></div>
     <div id="gridMach"><h2>MACS Machines<a id="titleSelected" class="SelectedTitle"></a></h2></div>

@@ -86,6 +86,8 @@ error_log( "Php Errors!" );
 						interval = setInterval(function (){ds.read();},(refRate *1000));
 					}
 				});
+				$("#Floorplan div").click(function () {
+					location.href = "MachGrid.php?mach_id=" + $(this).attr("id").substring(1);});
 			});
 			
 			function sformat(s) {
@@ -437,8 +439,5 @@ error_log( "Php Errors!" );
 			</div>
 			<div id="gridMachLog" class="AutoRefresh"></div>
 		</div>
-		<script>
-				$("#Floorplan div").click(function () {alert("Test");});
-		</script>
 	</body>
 </html>

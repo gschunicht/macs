@@ -7,16 +7,9 @@
 	
 	// Include config file
 	require_once 'config.php';
-	$result = $link->query("SELECT * FROM mach WHERE id like '".$mach_id."' AND active like '".$active."'");
+	$result = $link->query("SELECT * FROM mach WHERE id like '".$mach_id."' AND active like '".$active."' ORDER BY name");
 	
 	$outp = array();
-	//echo $result->num_rows;
-	echo "Machines([";
-	WHILE ($row =  mysqli_fetch_array($result, MYSQLI_ASSOC)){
-		echo json_encode($row).",";
-	}
-	echo "])";
-	//echo "mach_id:".$mach_id;
-	//echo "active:".$active;
-	//echo "Machines(".json_encode($outp).")";
+	$outp = $result->fetch_all(MYSQLI_ASSOC);
+	echo "Machines(".json_encode($outp).")";
 ?>
