@@ -8,6 +8,9 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
   header("location: login.php");
   exit;
 }
+if(isset($_SESSION['user_id']) || !empty($_SESSION['user_id'])){
+  $user_id = $_SESSION['user_id'];
+}
 ?>
 <html>
 	<head>
@@ -37,12 +40,26 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 		</script>
 		<script>
 			$(document).ready(function () {
+				//alert(<?php echo $user_id; ?>);
+				var modal = document.getElementById('myModal');	// Get the modal
+				var span = document.getElementsByClassName("close")[0];// Get the <span> element that closes the modal
+				// When the user clicks on <span> (x), close the modal
+				span.onclick = function() {
+				  modal.style.display = "none";
+				}
+				// When the user clicks anywhere outside of the modal, close it
+				window.onclick = function(event) {
+				  if (event.target == modal) {
+					modal.style.display = "none";
+				  }
+				}
+				$.getScript('js/macs.js');
 				setupMenu();
 				var mach_id = "<?php if ($_GET["mach_id"]) {echo htmlspecialchars($_GET["mach_id"]);}else {echo "%"; }?>";
 				console.log("mach_id: " + mach_id);
+				makeAccessGrid ();
 				getMachDataSource(mach_id);
 				getUserList();
-				findDataItem();
 				$("#btnAddMachAccess").kendoButton({
 					icon: "plus-circle",
 					click: function () {
@@ -54,7 +71,13 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 								user_id: $("#UserList").val() 
 							},
 							success: function(result){ //the AJAX returns the updated user_id so we can update the displayed machines
-								showUserAccess ($("#titleSelected").prop('title'));//TODO: investigate returning the whole JSON dataset and binding results (saves a round trip)
+								modal.style.display = "block";
+								if (result.AffectedRows==1) {$("#txtModal").text("User added to Machine successfully.");}
+								else {$("#txtModal").text("Update Failed: "+result.SQLError);}
+								showMachAccess ($("#titleSelected").prop('title'));//TODO: investigate returning the whole JSON dataset and binding results (saves a round trip)
+							},
+							error: function(XMLHttpRequest, textStatus, errorThrown) {
+								 alert("XMLHttpRequest: "+XMLHttpRequest+"|textStatus: "+textStatus+"|errorThrown: "+errorThrown);
 							}
 						});
 					}
@@ -80,14 +103,12 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						},
 						update: {
 							url: "json_Mach.php",	
-							dataType: "jsonp", // "jsonp" is required for cross-domain requests; use "json" for same-domain requests,
-							jsonpCallback: 'Machines',
 							type: "POST"
 						},
 						create: {
 							url: "json_Mach.php",	
 							dataType: "jsonp", // "jsonp" is required for cross-domain requests; use "json" for same-domain requests,
-							jsonpCallback: 'Machines',
+							jsonpCallback: 'Machines',	
 							type: "PUT"
 						}
 					},
@@ -95,33 +116,33 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
                         model: {
 							id: "id",
                             fields: {
-                                id: {
-									type: "string",
+                                id: {	type: "string",
 									editable: false,
-									nullable: true		
+									nullable: true
 								},
                                 name: { type: "string",
+									editable: true,								
+									validation: { required: true}
+								 },
+                                desc: { type: "string",
 									editable: true,
 									nullable: true		
 								 },
-                                mach_nr: { type: "string",
-									editable: false,
-									nullable: true		
+                                mach_nr: { type: "number",
+									editable: true,
+									validation: { required: true, min: 1},
+									defaultValue: 999
 								 },
-                                desc: { type: "string",
-									editable: false,
-									nullable: true		
-								 },
-                                last_seen: { type: "string",
+                                last_seen: { type: "date",
 									editable: false,
 									nullable: true		
 								 },
                                 active: { type: "boolean",
 									editable: true,
-									nullable: true		
+									defaultValue: true
 								 },
                                 version: { type: "string",
-									editable: true,
+									editable: false,
 									nullable: true		
 								 }
                             }
@@ -130,7 +151,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 					pageSize: 5
 				});	
 				makeMachGrid (mach_id);
-				if (mach_id) {
+				if (mach_id != '%') {
 					MachDataSource.filter({field:"id", operator: "eq", value: mach_id});
 					$("tr.k-filter-row th:nth-of-type(2)").html('<button type="button" class="k-button k-button-icon" id="btnClrFltr" aria-label="Clear"><span class="k-icon k-i-filter-clear"></span></button>')
 				}
@@ -143,9 +164,10 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 					dataSource: MachDataSource,
 					sortable: true,
 					//detailTemplate: kendo.template($("#template").html()),
-					editable:"inline",
+					editable:"popup",
 					selectable: "row",
 					filterable: {mode: "row"},
+					toolbar: ["create"], 
 					resizable: false,
 					reorderable: true,
 					pageable: {
@@ -154,7 +176,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						buttonCount: 5
 					},
 					columns: [
-						{ command: [{name:"edit",text:""}], title: " ", width:10},
+						{ command: [{name:"edit",text:"Edit"}], title: " ", width:10},
 						{
 						field: "id",
 						title: "ID",
@@ -169,12 +191,20 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						title: "Description",
 						width: 20
 					}, {
-						field: "machine_nr",
+						field: "mach_nr",
 						title: "Machine NR",
+						format: "{0:#}",
 						width: 20
+					}, {
+						template: '<span  #= active ? \'class="k.i.checkbox-checked"\' : \'class="k.i.checkbox"\'# />', 
+						field: "active",
+						title: "Active",
+						filterable: false ,
+						width: 10 
 					}, {
 						field: "last_seen",
 						title: "Last Seen",
+						format: "{0:ddd MM/dd h:mm tt}",
 						filterable: false ,
 						width: 25
 					}, {
@@ -182,12 +212,6 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						title: "Version",
 						filterable: false ,
 						width: 25
-					}, {
-						template: '<span  #= active ? \'class="k.i.checkbox-checked"\' : \'class="k.i.checkbox"\'# />', 
-						field: "active",
-						title: "Active",
-						filterable: false ,
-						width: 10
 					}],
 					change: function() {
 						var gview = $("#gridMach").data("kendoGrid");
@@ -199,12 +223,33 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						
 					}
 				});
-				if (mach_id) {
+				if (mach_id != '%') {
 					showMachAccess(mach_id);
 					showMachLog(mach_id);
 				} else {
 					$("[date-text-field='name'] ").focus();
 				}
+			}
+			function makeAccessGrid () {
+				$("#gridMachAccess").kendoGrid({
+					width: 300,
+					sortable: true,
+					reorderable: true,
+					editable: { //disables the update functionality, only allows deletion
+						update: false,
+						mode: "inline",
+						destroy: true
+					},
+					columns: [
+						{command: [{name:"destroy",text:"Remove"}], title: " ", width:25},
+						{
+							field: "userName",
+							title: "User Name",
+							sortable: true,
+							width: 80
+						}
+						]
+				});
 			}
 			
 			function showMachAccess (Mach_ID) {
@@ -241,27 +286,9 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 					//sort Grid's dataSource
 					MachAccessDataSource.sort({field: "machName", dir: "asc"});
 				
-				$("#gridMachAccess").kendoGrid({
-					dataSource: MachAccessDataSource,
-					width: 300,
-					sortable: true,
-					reorderable: true,
-					editable: { //disables the update functionality, only allows deletion
-						update: false,
-						mode: "inline",
-						destroy: true
-					},
-					//rowTemplate: kendo.template($("#UserMachine").html()),
-					columns: [
-						{command: [{name:"destroy",text:""}], title: " ", width:20},
-						{
-							field: "userName",
-							title: "User Name",
-							sortable: true,
-							width: 80
-						}
-						]
-				});
+				
+				var grid = $('#gridMachAccess').data("kendoGrid");
+				grid.setDataSource(MachAccessDataSource);
 				$("#gridMachAccess").show();
 			}
 			
@@ -322,7 +349,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 				$("#gridMachLog").show();
 			}	
 			
-			function getUserList(){  //TODO - get this list to populate the User selector
+			function getUserList(){  //TODO - get this list to populate the User selector with only unauthorized users
 		
 				$("#UserList").kendoDropDownList({
 					dataTextField: "name",
@@ -377,5 +404,15 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 		<div id="AddAccess"><input id="UserList"></input><em id="btnAddMachAccess">Add</em> </div>
 	</div>
 </div>
+<!-- The Modal -->
+<div id="myModal" class="modal">
+
+  <!-- Modal content -->
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <p id="txtModal">Some text in the Modal..</p>
+  </div>
+
+</div
 </body>
 </html>

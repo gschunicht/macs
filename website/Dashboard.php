@@ -51,7 +51,6 @@ error_log( "Php Errors!" );
 			$(document).ready(function () {
 				setupMenu();
 				showMachLog();
-				listDailyUsers();
 				var ds = $(".AutoRefresh").data("kendoGrid").dataSource;
 								
 								
@@ -87,34 +86,8 @@ error_log( "Php Errors!" );
 						interval = setInterval(function (){ds.read();},(refRate *1000));
 					}
 				});
-				$("#Floorplan div").click(function () {
-					location.href = "MachGrid.php?mach_id=" + $(this).attr("id").substring(1);});
-				
 			});
 			
-			function listDailyUsers (){
-				var DailyUsersDataSource = new kendo.data.DataSource({
-					transport: {
-						read: {
-							url: "json_DailyUsers.php",	
-							dataType: "jsonp", // "jsonp" is required for cross-domain requests; use "json" for same-domain requests,
-							jsonpCallback: 'DailyUsers'
-						}
-					},
-					schema: {
-                        model: {
-                            fields: {
-                                userName: { type: "string" }
-                            }
-                        }
-                    }
-				});	
-				
-				$("#listDailyUsers").kendoListView({
-					dataSource: DailyUsersDataSource,
-					template: "<div class=\"DailyUser\">#:userName#</div>"
-				});
-			}
 			function sformat(s) {
 				var eDays = Math.floor(s / 60 / 60 / 24);
 				if (eDays > 1){
@@ -201,28 +174,16 @@ error_log( "Php Errors!" );
 					$(machineID).prop('title',machData[i].userName);
 					if (machData[i].event == 'Unlocked') {
 						$(machineID).addClass('Unlocked');
-						$(machineID).removeClass('Locked');
 					} else if (machData[i].event == 'Locked') {
 						$(machineID).addClass('Locked');
-						$(machineID).removeClass('Unlocked');
 					} else {
 						$(machineID).addClass('Unknown');
-						$(machineID).removeClass('Unlocked');
-						$(machineID).removeClass('Locked');
 					}
 				}
 			}
 		</script>
 		<style> 
-			#topRight{
-				position:relative;
-				width: 200px;
-				top:-546px;
-				left:850px;
-			}
-			.DailyUser {
-				margin:5px;
-			}
+
 			#Floorplan {
 				position:relative;
 				width: 800px;
@@ -230,6 +191,7 @@ error_log( "Php Errors!" );
 				background-color: rgba(255,255,255,0.25);
 				background-image: url("images/floorplan.svg");
 				background-repeat: no-repeat;
+				margin: auto;
 				margin-top:20px;
 			}
 			#Floorplan div {
@@ -276,9 +238,6 @@ error_log( "Php Errors!" );
 			}
 			#gridMachLog {
 				margin:auto;
-				position: relative;
-				top: -50px;
-				left: 10px;
 			}
 			#Floorplan div.Locked {
 				background: #008000;
@@ -302,7 +261,7 @@ error_log( "Php Errors!" );
 		</style>
 		<style>
 			#M33 { /* Laser 1 */
-				bottom: 27px;
+				bottom: 165px;
 				left: 580px;
 				width: 55px;
 				height: 25px;
@@ -313,7 +272,7 @@ error_log( "Php Errors!" );
 				width: 100px;
 				height: 50px;
 			}
-			#M69 { /* Metal Lathe */
+			#M36 { /* Metal Lathe */
 				bottom: 440px;
 				left: 525px;
 				width: 65px;
@@ -368,8 +327,8 @@ error_log( "Php Errors!" );
 				height: 40px;
 			}
 			#M55 { /* Bandsaw */
-				bottom: 465px;
-				left: 200px;
+				bottom: 280px;
+				left: 450px;
 				width: 40px;
 				height: 40px;
 			}
@@ -380,7 +339,7 @@ error_log( "Php Errors!" );
 				height: 15px;
 			}
 			#M57 { /* Laser 2 */
-				bottom: 165px;
+				bottom: 27px;
 				left: 580px;
 				width: 55px;
 				height: 25px;
@@ -439,12 +398,6 @@ error_log( "Php Errors!" );
 				width: 75px;
 				height: 75px;
 			}
-			#M68 { /* Resaw Bandsaw */
-				bottom: 280px;
-				left: 450px;
-				width: 40px;
-				height: 40px;
-			}
 		</style>
 	</head>
 	<body>
@@ -453,7 +406,7 @@ error_log( "Php Errors!" );
 			<div id="Floorplan">
 				<div id="M33" class="rotate90"><a>Laser 1</a></div>
 				<div id="M35"><a>Saw Stop</a></div>
-				<div id="M69" class="rotate90"><a>Metal Lathe</a></div>
+				<div id="M36" class="rotate90"><a>Metal Lathe</a></div>
 				<div id="M37"><a>Wood Lathe</a></div>
 				<div id="M41"><a>Panel Saw</a></div>
 				<div id="M42"><a>Planer</a></div>
@@ -474,13 +427,11 @@ error_log( "Php Errors!" );
 				<div id="M65"><a>Test</a></div>
 				<div id="M66"><a>Sign In</a></div>
 				<div id="M67"><a>CNC Router</a></div>
-				<div id="M68"><a>ReSaw</a></div>
-			</div>
-			<div id="topRight">
-				<h3>Today's&nbspMembers</h3>
-				<div id="listDailyUsers"></div>
 			</div>
 			<div id="gridMachLog" class="AutoRefresh"></div>
 		</div>
+		<script>
+				$("#Floorplan div").click(function () {alert("Test");});
+		</script>
 	</body>
 </html>

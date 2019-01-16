@@ -33,11 +33,25 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 
 		<script>
 			$(document).ready(function () {
-				setupMenu(); //Creates navigation buttons at top of page
-				getUserDataSource(); //Build the Kendo datasource object
-				makeUserGrid (); //Build the main Kendo grid of users.
-				makeAccessGrid (); //Build the sub-grid of authorized machines.
-				getMachList(); //Populate the drop down list for adding machine access records
+				// Get the modal popup
+				var modal = document.getElementById('myModal');	
+				// Get the <span> element that closes the modal
+				var span = document.getElementsByClassName("close")[0];
+				// When the user clicks on <span> (x), close the modal
+				span.onclick = function() {modal.style.display = "none";}
+				// When the user clicks anywhere outside of the modal, close it
+				window.onclick = function(event) {if (event.target == modal) {modal.style.display = "none";}}
+				//Create navigation buttons at top of page
+				setupMenu(); 
+				//Build the Kendo datasource object (queries the database)
+				getUserDataSource(); 
+				//Build the main Kendo grid of users.
+				makeUserGrid (); 
+				//Build the sub-grid of authorized machines.
+				makeAccessGrid (); 
+				//Populate the drop down list for adding machine access records
+				getMachList(); 
+				//Handle the clicking of the "Add" button
 				$("#btnAddMachAccess").kendoButton({
 					icon: "plus-circle",
 					click: function () {
@@ -48,14 +62,26 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 								user_id: $("#titleSelected").prop('title'), 
 								mach_id: $("#MachList").val() 
 							},
-							success: function(result){ //the AJAX returns the updated user_id so we can update the displayed machines
-								showUserAccess (result);//TODO: investigate returning the whole JSON dataset and binding results (saves a round trip)
+							//the AJAX returns the user_id that was updated, # of affected rows, and any SQL error
+							//TODO: investigate returning the whole JSON dataset and binding results (saves a round trip)
+							success: function(result){ 
+								//Set the modal box to visible
+								modal.style.display = "block"; 
+								//Set the message of the modal box depending on the results
+								if (result.AffectedRows==1) {$("#txtModal").text("User added to Machine successfully.");}
+								else {$("#txtModal").text("Update Failed: "+result.SQLError);}
+								//Update the User's access grid
+								showUserAccess (result.UserID);
+							},
+							//If the AJAX fails, display the error in a popup
+							error: function(XMLHttpRequest, textStatus, errorThrown) {
+								 alert("XMLHttpRequest: "+XMLHttpRequest+"|textStatus: "+textStatus+"|errorThrown: "+errorThrown);
 							}
 						});
 					}
 				});
 				
-				//jQuery for menu buttons - TODO: move this to macs.js
+				//Setup menu buttons - TODO: move this to macs.js
 				$("#btnUsers").kendoButton({
 					icon: "user",
 					click: function () {location.href = "UserGrid.php";}
@@ -80,7 +106,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 				UserDataSource = new kendo.data.DataSource({
 					transport: {
 						read: {
-							url: "json_Users.php",	
+							url: "json_Users.php?active=1",	
 							dataType: "jsonp", // "jsonp" is required for cross-domain requests; use "json" for same-domain requests,
 							jsonpCallback: 'Users',
 							type: "GET"
@@ -91,7 +117,9 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						},
 						create: {
 							url: "json_Users.php",	
-							type: "PUT"
+							type: "PUT",
+							dataType: "jsonp", // "jsonp" is required for cross-domain requests; use "json" for same-domain requests,
+							jsonpCallback: 'Users'
 						}
 					},
 					schema: {
@@ -100,63 +128,56 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
                             fields: {
                                 id: {
 									type: "string",
-									editable: false,
-									nullable: true		
+									editable: false	
 								},
-                                name: { type: "string",
-									editable: true,
-									nullable: true		
-								 },
-                                login: { type: "string",
-									editable: false,
-									nullable: true		
-								 },
-                                hash: { type: "string",
-									editable: false,
-									nullable: true		
-								 },
-                                badge_id: { type: "string",
-									editable: true,
-									nullable: true		
-								 },
-                                email: { type: "string",
-									editable: true,
-									nullable: true		
-								 },
-                                last_seen: { type: "string",
-									editable: false,
-									nullable: true		
-								 },
                                 active: { type: "boolean",
 									editable: true,
 									nullable: true		
+								 },
+                                name: { 
+									type: "string",
+									validation: { required: true, pattern:'.{2,50}'}
+								 },
+                                login: { type: "string",
+									nullable: true,
+									validation: {pattern:'.{4,25}'}		
+								 },
+                                hash: { type: "string",
+									editable: true,
+									nullable: true,
+									validation: {pattern:'.{8,20}'}		
+								 },
+                                badge_id: { type: "string",
+									editable: true,
+									nullable: true,
+									validation: {pattern:'.{8,20}'}			
+								 },
+                                email: { type: "string",
+									editable: true,
+									nullable: true,
+									validation: {email: true}
+								 },
+                                last_seen: { type: "string",
+									editable: false,
+									nullable: true
 								 }
                             }
                         }
                     },
-					requestStart: function() {
-						kendo.ui.progress($("#gridUser"), true);
-					},
-					requestEnd: function() {
-						kendo.ui.progress($("#gridUser"), false);
-					},
 					pageSize: 5
 				});	
 			}
 			
 			function makeUserGrid (){
-				
+				//Define the  user list data source
 				 $("#gridUser").kendoGrid({
 					dataSource: UserDataSource,
 					sortable: true,
-					editable:"inline",
-					beforeEdit:function(e){$("#AddAccess").show();},
-					cancel:function(e){	$("#AddAccess").hide();},
-					save:function(e){$("#AddAccess").hide();},
-					edit: function() {
-                          $("#gridUser").data("kendoGrid").select(".k-grid-edit-row");
-                        },
-					//toolbar: ["create", "save", "cancel"], //TODO: add new users and set active status requires separate form/template
+					editable:{mode: "popup"},
+					beforeEdit:function(e){$("#AddAccess").hide();},
+					cancel:function(e){	$("#AddAccess").show();},
+					save:function(e){$("#AddAccess").show();},
+					toolbar: ["create"], 
 					selectable: "row",
 					filterable: {mode: "row"},
 					resizable: false,
@@ -175,19 +196,34 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						field: "id",
 						title: "ID",
 						width: 5
+						},{ 
+						template: "#= templateUserActive(active) #",
+						field: "active",
+						title: "Active",
+						filterable: false ,
+						width: 6
 						},{
 						field: "name",
 						title: "User Name",
-						sortable: {
-							initialDirection: "asc"  
-						},
+						sortable: {initialDirection: "asc"},
 						filterable: {cell: {operator: "contains"}},
 						width: 25
 						},{
 						field: "login",
 						title: "Log In",
-						filterable: false ,
 						width: 20
+						},{
+						field: "hash",
+						hidden: true,
+						title : "Password",
+						editor: function (container, options) {
+							$('<input data-text-field="' + options.field + '" ' +
+									'class="k-input k-textbox" ' +
+									'type="password" ' +
+									'data-value-field="' + options.field + '" ' +
+									'data-bind="value:' + options.field + '"/># alert("test"); #')
+									.appendTo(container)
+						}
 						},{
 						field: "badge_id",
 						title: "Badge #",
@@ -195,16 +231,9 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						},{
 						field: "email",
 						title: "Email Address",
-						filterable: false ,
 						width: 25
-						},{ //TODO: use graphic or checkbox to indicate value. 
-						template: "#= templateUserActive(active) #", 
-						editor: customBoolEditor,
-						field: "active",
-						title: "Active",
-						filterable: false ,
-						width: 10
 					}],
+					//When the selected user changes, do these things
 					change: function() {
 						var gview = $("#gridUser").data("kendoGrid");
 						var selectedItem = gview.dataItem(gview.select()); //get the currently selected user in main user grid
@@ -215,19 +244,19 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						
 					}
 				});
-				$("[date-text-field='name'] ").focus(); //set initial focus on the name search/filter box
+				//set initial focus on the name search/filter box
+				$("[date-text-field='name'] ").focus(); 
 			}
 		
-			function makeAccessGrid () {
+			function makeAccessGrid () {				
+				//Define the selected user's access list grid
 				$("#gridUserAccess").kendoGrid({
-					//dataSource: UserAccessDataSource,
 					width: 300,
 					sortable: true,
 					reorderable: true,
 					editable: { //disables the update functionality, only allows deletion
 						update: false,
 						mode: "inline",
-						//confirmation: false,
 						destroy: true
 					},
 					columns: [
@@ -253,6 +282,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 				$('<label class="k-checkbox-label" for="' + guid + '">&#8203;</label>').appendTo(container);
 			}
 			function showUserAccess (User_ID) {
+				//Define the selected user's access list data source
 				var UserAccessDataSource = new kendo.data.DataSource({
 					transport: {
 						read: {
@@ -279,20 +309,18 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 								}
 							}
 						}
-					},
-					requestStart: function() {
-						kendo.ui.progress($("#gridUserAccess"), true);
-					},
-					requestEnd: function() {
-						kendo.ui.progress($("#gridUserAccess"), false);
 					}
 				});	
+				//Get the User Access grid
 				var grid = $('#gridUserAccess').data("kendoGrid");
+				//Set the data source for the user Access grid
 				grid.setDataSource(UserAccessDataSource);
+				//Show the User Access grid
 				$("#gridUserAccess").show();
 			}
 			
 			function showUserLog (User_ID) {
+				//Define the selected user's log datasource
 				var UserLogDataSource = new kendo.data.DataSource({
 					transport: {
 						read: {
@@ -312,15 +340,9 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
                                 logonName: { type: "string" }
                             }
                         }
-                    },
-					requestStart: function() {
-						kendo.ui.progress($("#gridUserLog"), true);
-					},
-					requestEnd: function() {
-						kendo.ui.progress($("#gridUserLog"), false);
-					}
+                    }
 				});	
-				
+				//Define the selected user's log grid
 				$("#gridUserLog").kendoGrid({
 					dataSource: UserLogDataSource,
 					width: 300,
@@ -344,15 +366,15 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 						width: 30
 						}]
 				});
-			
+				//Show the selected user's log grid
 				$("#gridUserLog").show();
 			}	
 			
 			function getMachList(){  //populates the drop down list for adding machine access.
 		
 				$("#MachList").kendoDropDownList({
-							dataTextField: "name",
-							dataValueField: "id",
+							dataTextField: "name", //What the user sees in the list
+							dataValueField: "id", //What the software uses to actually link
 							dataSource: {
 								transport: {
 									read: {
@@ -367,7 +389,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 							
 			}
 						
-			function templateUserActive(active) {
+			function templateUserActive(active) {//This function returns different Icons depending on the value sent
 				if (active == 1) {
 					return "<span class='k-icon k-i-checkmark-circle'></span>";
 				} else {
@@ -375,31 +397,32 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 				}
 			}
 		</script>
-	<style type="text/css">
-	button {
-		height:20px;
-		width:40px;
-		
-	}
-	#primary {
-		max-width:1200px;
-		margin:auto;
-	}
-	#gridUserLog {
-		width:60%;
-		height:800px;
-		float:right;
-	}
-	#gridUserAccess {
-		width:39%;
-		height:800px;
-		float:left;
-	}
-	.SelectedTitle {
-		color:#00b0ff;
-	}
 
-	</style>
+		<style type="text/css">
+			button {
+				height:20px;
+				width:40px;
+				
+			}
+			#primary {
+				max-width:1200px;
+				margin:auto;
+			}
+			#gridUserLog {
+				width:60%;
+				height:800px;
+				float:right;
+			}
+			#gridUserAccess {
+				width:39%;
+				height:800px;
+				float:left;
+			}
+			.SelectedTitle {
+				color:#00b0ff;
+			}
+			table {margin:auto;}
+		</style>
 	</head>
 <body>
 <div id="master" class="Content">
@@ -410,6 +433,16 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 		<h2>Authorized Machines</h2>
 		<div id="AddAccess"><select id="MachList"></select><em id="btnAddMachAccess">Add</em> </div>
 	</div>
+</div>
+<!-- The Modal -->
+<div id="myModal" class="modal">
+
+  <!-- Modal content -->
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <p id="txtModal">Some text in the Modal..</p>
+  </div>
+
 </div>
 </body>
 </html>

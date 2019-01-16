@@ -1,6 +1,13 @@
 <?php
 	// Include config file
 	require_once 'config.php';
+	
+	// Include Logging Functions
+	require_once 'Logging.php';
+	// Initialize the session
+	session_start();
+	// get logged in user id
+	$login = $_SESSION['user_id'];
 
 	// add the header line to specify that the content type is JSON
 	header("Content-Type: application/json; charset=UTF-8");
@@ -26,7 +33,18 @@
 		if (!empty($post_vars["user_id"])) {
 			$id = htmlspecialchars($post_vars["id"]);//Get id for SQL UPDATE
 			$result = $link->query("DELETE FROM access WHERE id = ".$id);
-			echo $result;
+			//echo mysqli_affected_rows($link);
+			if ((mysqli_affected_rows($link)<>1)) {
+				echo "\n\r Affected Rows: ".mysqli_affected_rows($link);
+				echo ("\n\r SQL Error: ". mysqli_error($link));
+				//Log the activity to the database
+				logEntry($post_vars["user_id"],$post_vars["mach_id"],"Remove Machine Access -  Failed",$login);
+			}
+			else {
+				echo $user_id;
+				//Log the activity to the database
+				logEntry($post_vars["user_id"],$post_vars["mach_id"],"Remove Machine Access -  Success",$login);
+			}
 		} 
 		else{
 			header("HTTP/1.1 500 Internal Server Error");
@@ -41,7 +59,16 @@
 				$user_id = htmlspecialchars($post_vars["user_id"]);//Get user_id for SQL UPDATE
 				$mach_id = htmlspecialchars($post_vars["mach_id"]);//Get mach_id for SQL UPDATE
 				$result = $link->query("INSERT INTO access (user_id, mach_id) VALUES(".$user_id.", ".$mach_id.") ");
-				echo $user_id;
+				if (!$result ) {
+					echo json_encode(array("UserID"=>$user_id,"AffectedRows"=>mysqli_affected_rows($link),"SQLError"=>mysqli_error($link)));
+					//Log the activity to the database
+					logEntry($post_vars["user_id"],$post_vars["mach_id"],"Add Machine Access -  Failed",$login);
+				}
+				else {				
+					echo json_encode(array("UserID"=>$user_id,"AffectedRows"=>mysqli_affected_rows($link),"SQLError"=>mysqli_error($link)));
+					//Log the activity to the database
+					logEntry($post_vars["user_id"],$post_vars["mach_id"],"Add Machine Access -  Success",$login);
+				}
 			}
 		} 
 		else{

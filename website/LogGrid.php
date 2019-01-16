@@ -21,6 +21,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 
 		<script src="//kendo.cdn.telerik.com/2018.2.516/js/jquery.min.js"></script>
 		<script src="//kendo.cdn.telerik.com/2018.2.516/js/kendo.all.min.js"></script>
+		<script src="//kendo.cdn.telerik.com/2018.2.516/js/jszip.min.js"></script>
 		<script src="js/macs.js"></script>
 		
 
@@ -30,6 +31,10 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 				setupMenu();
 				getLogDataSource();
 				makeLogGrid ();
+				$("#btnExport").kendoButton({
+					icon: "file-excel",
+					click: function () {exportLog()}
+				});
 			});
 			
 			function getLogDataSource (){
@@ -166,6 +171,66 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
             });
 
         }
+		    
+			function exportLog(){
+				
+				var dataSource = $("#gridLog").data("kendoGrid").dataSource;
+				var filters = dataSource.filter();
+				var allData = dataSource.data();
+				var query = new kendo.data.Query(allData);
+				var data = query.filter(filters).data;
+				var rows = [{
+					cells: [
+					   // First cell
+					  { value: "logDateTime" },
+					   // Second cell
+					  { value: "userName" },
+					  // Third cell
+					  { value: "machName" },
+					  // Fourth cell
+					  { value: "event" },
+					  // Fifth cell
+					  { value: "logonName" },
+					  // Sixth cell
+					  { value: "usage" }
+					]
+				  }];
+				  alert("Exporting "+data.length+" rows of logging");
+				for (var i = 0; i < data.length; i++){
+				  //push single row for every record
+				  rows.push({
+					cells: [
+					  { value: data[i].logDateTime },
+					  { value: data[i].userName },
+					  { value: data[i].machName },
+					  { value: data[i].event },
+					  { value: data[i].logonName },
+					  { value: data[i].usage }
+					]
+				  })
+				}
+				var workbook = new kendo.ooxml.Workbook({
+				  sheets: [
+					{
+					  columns: [
+						// Column settings (width)
+						{ autoWidth: true },
+						{ autoWidth: true },
+						{ autoWidth: true },
+						{ autoWidth: true },
+						{ autoWidth: true },
+						{ autoWidth: true }
+					  ],
+					  // Title of the sheet
+					  title: "MACS Log",
+					  // Rows of the sheet
+					  rows: rows
+					}
+				  ]
+				});
+				//save the file as Excel file with extension xlsx
+				kendo.saveAs({dataURI: workbook.toDataURL(), fileName: "MACS_Log.xlsx"});
+			  }
 		</script>
 		<style>
 			span.k-picker-wrap {width:90px; white-space:normal;}
@@ -176,7 +241,7 @@ if(!isset($_SESSION['username']) || empty($_SESSION['username'])){
 		</style>
 	</head>
 <body>
-<div id="master"  class="Content">
+<div id="master"  class="Content"><span class="menuRight"><em id="btnExport">Export</em></span>
 	<div id="menu"></div>
     <div id="gridLog" class="AutoRefresh"><h2>MACS Log</h2></div>
 
