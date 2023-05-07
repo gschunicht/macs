@@ -1,7 +1,7 @@
 #include "config.h"
 
 static const uint16_t TIMEOUT = 5000; // Allow maximum 5s between data packets.
-
+#define LOGGING 1
 /**
 * Constructor.
 */
@@ -182,7 +182,6 @@ void HttpClient::request(http_request_t &aRequest, http_response_t &aResponse, h
 
     unsigned int bufferPosition = 0;
     unsigned long lastRead = millis();
-    unsigned long firstRead = millis();
     bool error = false;
     bool timeout = false;
 
@@ -250,8 +249,8 @@ void HttpClient::request(http_request_t &aRequest, http_response_t &aResponse, h
         Serial1.println("\r\nHttpClient>\tError: Timeout while reading response.");
     }
     Serial1.print("\r\nHttpClient>\tEnd of HTTP Response (");
-    Serial1.print(millis() - firstRead);
-    Serial1.println("ms).");
+    //Serial1.print(millis() - firstRead);
+    //Serial1.println("ms).");
     #endif
     client.stop();
 
