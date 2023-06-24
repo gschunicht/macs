@@ -74,7 +74,7 @@ http_response_t response;
 
 boolean cardPresent = false;
 
-
+SerialLogHandler logHandler;
 
 
 //////////////////////////////// SETUP ////////////////////////////////
@@ -86,6 +86,8 @@ void setup() {
     }
     pinMode(RELAY_PIN,OUTPUT);          // driver for the relay
     pinMode(TAG_IN_RANGE_INPUT,INPUT);
+
+    Log.info("Logging Startup");
     
     // register system handles
     System.on(wifi_listen, listen);
@@ -104,8 +106,6 @@ void setup() {
     pinMode(DB_LED_AND_UPDATE_PIN,INPUT_PULLUP);
     Serial1.begin(9600); // card reader
     Serial.begin(9600);  // debug out
- 
-    delay(5000);
 
     // setup https client
     request.ip = HOSTNAME;
@@ -116,23 +116,23 @@ void setup() {
     if(digitalRead(DB_LED_AND_UPDATE_PIN)){
         
         // ############ MACS MODUS ############ // 
-        #ifdef DEBUG_JKW_MAIN_SETUP
-        Serial.println("- MACS -");
-        #endif
+        Log.info("- MACS -");
         
-        //red_led.on();
-        //green_led.on();
+        red_led.on();
+        green_led.on();
         
         set_connected(NOT_CONNECTED); // init as not connected
         if(update_ids(true)){ // true = force update, update_ids will initiate the connect
             set_connected(CONNECTED);
         } else {
-            set_connected(NOT_CONNECTED,true); // force LED update for not connected
+            set_wifi_connected(NOT_CONNECTED,true); // force LED update for not connected
             read_EEPROM();
         }
         // ############ MACS MODUS ############ // 
         
     } else {
+        Log.info("- MACS - Update");
+
        goto_update_mode();
     }
 }
@@ -145,9 +145,8 @@ void goto_update_mode(){
     green_led.on();
     db_led.on();
     
-    #ifdef DEBUG_JKW_MAIN_SETUP
-    Serial.println("- Cloud -");
-    #endif
+    Log.info("- Cloud -");
+
     
     // satrt loop that will set wifi data and connect to cloud,
     // and if anything fails start again, until there is an update
@@ -155,24 +154,21 @@ void goto_update_mode(){
         // set_update_login will return true, if we've read a valid config from 
         // the EEPROM memory AND that WIFI was in range AND the module has saved the login
         if(set_update_login(&green_led,&red_led)){
-            Serial.println("set update login done");
+            Log.info("set update login done");
+
             Particle.connect();
             uint8_t i=0;
 
             // backup, if connect didn't work, repeat it
             while(!WiFi.ready()){
-                Serial.print(".");
+                Log.info("wait wifi .");
+               
                 Particle.connect();
             }
 
             // stay in update mode forever
             while(WiFi.ready()){
                 if(i!=millis()/1000){
-                    
-                    #ifdef DEBUG_JKW_MAIN_SETUP
-                    Serial.print(i);
-                    Serial.print(": ");
-                    #endif
                     
                     if(Particle.connected()){
                         // as soon as we are connected, swtich to blink mode to make it visible
@@ -193,15 +189,12 @@ void goto_update_mode(){
                         green_led.check();
                         db_led.check();
                         
-                        #ifdef DEBUG_JKW_MAIN_SETUP
-                        Serial.println("Photon connected");
-                        #endif
+                        Log.info("Photon connected to wifi");
+
                         
                     } else {
                         
-                        #ifdef DEBUG_JKW_MAIN_SETUP
-                        Serial.println("Photon NOT connected");
-                        #endif
+                        Log.warn("Photon NOT connected to wifi");
                         
                         // constant on == not yet connected
                         red_led.on();
@@ -222,20 +215,33 @@ void goto_update_mode(){
 //////////////////////////////// MAIN LOOP ////////////////////////////////
 // woop woop main loop
 void loop() {
-    // check if we found a tag
+    // check if we found a tag (just inserted)
 
     if(tag_found(currentTagBuf,&currentTag)){
         if(currentTag == UPDATECARD){
             goto_update_mode();
         }
+
+
         // if we found a tag, test it
         // if it works close relay,
         // if not - ask the server for an update and try again
         uint8_t tries=2; // two tries to check the card
         while(tries){
+
+            int taginserted = digitalRead(TAG_IN_RANGE_INPUT);
+            Log.info("card inserted state  %d ", taginserted);
+
+            if (taginserted == 0)
+            {
+                // if nothing here no reason to check access
+                tries = 0;
+                continue;
+            }
+
             // compares known keys, returns true if key is known
             if(access_test(currentTag)){
-                relay(RELAY_CONNECTED);
+                set_relay_state(RELAY_CONNECTED);
                 tries=0;
                 // takes long
                 create_report(LOG_RELAY_CONNECTED,currentTag,0);
@@ -247,60 +253,66 @@ void loop() {
                 // the red will be off anywa (ok), we want to show that this card was good, turn green on
                 // 4. assuming that we are connected, we reached this point then create_report will not try to reconnect, but the report failed, create_report will set us to not conneted
                 // the red will be blinkin (ok), we want to show that this card was good, turn green on
-                set_connected(connected,1); // force to resume LED pattern
+                set_wifi_connected(connected,1); // force to resume LED pattern
                 green_led.on();
-            } else {
-                // if we have a card that is not known to be valid we should maybe check our database
-                if(tries>1){
-            
-                    #ifdef DEBUG_JKW_MAIN
-                    Serial.println("Card Key not valid, requesting update from server");
-                    #endif
-                    
-                    update_ids(false); // unforced update
-                    // above does nothing if we read once...
-                    // check if this one badge is in DB, a fallback if errors.
+                tries = 0; // done
+                break; 
+            } 
 
-                    check_db_for_one_tag(currentTag);
-                        
-                    
-                    #ifdef DEBUG_JKW_MAIN
-                    if(tries>0){
-                        Serial.println("Trying once more if key is valid now");
-                    };
-                    #endif
-                    
-                    tries-=1;
-                } else {
-                    
-                    #ifdef DEBUG_JKW_MAIN
-                    Serial.println("card key still not valid. :P");
-                    #endif
-                    
-                    tries=0;   
-                    // takes long
-                    create_report(LOG_LOGIN_REJECTED,currentTag,0);
-                    red_led.on();
-                }
+            tries--; 
+
+            update_ids(false); // unforced update
+            // above will just look to see if there is a recent update, eg new user/ access granted
+            // check if this one badge is in DB, a fallback if errors.
+
+            // if we have a card that is not known to be valid we should maybe check our database
+            Log.info("Card Key not valid, requesting update from server");
+
+            if (check_db_for_one_tag(currentTag))
+            {
+                set_relay_state(RELAY_CONNECTED);
+                tries=0;
+                // takes long
+                create_report(LOG_RELAY_CONNECTED,currentTag,0);
+                set_wifi_connected(connected,1); // force to resume LED pattern
+                green_led.on();
+                break;
             }
+                   
+            Log.warn("card key still not valid / found in DB or stored data");
+
+            if (tries == 0 )  {              // takes long
+                create_report(LOG_LOGIN_REJECTED,currentTag,0);
+                red_led.on();
+            }
+            
         }
     }
     
+
+
     
     // card moved away
     // if Serial has avaioable chars, it means that TAG IN RANGE had to be low at some point, its just a new card there now!
-    if((digitalRead(TAG_IN_RANGE_INPUT)==0 || Serial.available()) && currentTag!=(uint32_t)0xffffffff){ 
+    if(digitalRead(TAG_IN_RANGE_INPUT)==0 && current_relay_state==RELAY_CONNECTED) { 
+
+        int taginserted = digitalRead(TAG_IN_RANGE_INPUT);
+
+        Log.info("card key state  %d", taginserted);
+        
+        // maybe flush if no tag ??
+        //while(Serial1.available()){
+        //       uint8_t temp=Serial1.read();
+        //}
         // open the relay as soon as the tag is gone
         if(current_relay_state==RELAY_CONNECTED){
-            uint32_t open_time_sec=relay(RELAY_DISCONNECTED);
-            green_led.resume();
+            uint32_t open_time_sec=set_relay_state(RELAY_DISCONNECTED);
+
             // last because it takes long
             create_report(LOG_RELAY_DISCONNECTED,currentTag,open_time_sec);
-        } /*else {
-            red_led.resume();    
-        } */
+        }
         
-        set_connected(connected,1); // force to resume LED pattern
+        set_wifi_connected(connected,1); // force to resume LED pattern
     
         currentTag=-1;      // reset current user
         currentTagIndex=0;  // reset index counter for incoming bytes
@@ -325,41 +337,18 @@ void loop() {
 //////////////////////////////// ACCESS TEST ////////////////////////////////
 // callen from main loop as soon as a tag has been found to test if it matches one of the saved keys
 bool access_test(uint32_t tag){
-    #ifdef DEBUG_JKW_MAIN
-    Serial.print("Tag ");
-    Serial.print(tag);
-    Serial.print(" found. Checking database (");
-    Serial.print(keys_available);
-    Serial.print(") for matching key");
-    Serial.println("==============");
-    #endif
-    
-    for(uint16_t i=0;i<MAX_KEYS && i<keys_available; i++){
 
-        #ifdef DEBUG_JKW_MAIN
-       // Serial.print(i+1);
-       // Serial.print(" / ");
-       // Serial.print(keys_available);
-       // Serial.print(" Compare current read tag ");
-       // Serial.print(tag);
-       // Serial.print(" to stored key ");
-       // Serial.print(keys[i]);
-       // Serial.println("");
-        #endif
+    Log.info("Check tag %lu value read from reader there are %d keys in memory ", tag, keys_available);
+
+    for(uint16_t i=0;i<MAX_KEYS && i<keys_available; i++){
         
         if(keys[i]==tag){
 
-    #ifdef DEBUG_JKW_MAIN
-    Serial.println("Card Key valid, closing relay");
-    #endif
+            Log.info("Card Key found in memory");
     
             return true;
         }
     }
-
-    #ifdef DEBUG_JKW_MAIN
-    Serial.println("==============");
-    #endif
     
     return false;
 }
@@ -367,25 +356,26 @@ bool access_test(uint32_t tag){
 
 //////////////////////////////// DRIVE THE RELAY ////////////////////////////////
 // hardware controll, writing to the pin and log times
-uint32_t relay(int8_t input){
-    if(input==1){
-        
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("Connecting relay!");
-        #endif
+uint32_t set_relay_state(int8_t input){
+    if(input==RELAY_CONNECTED){
+
+        Log.info("Connecting relay!");
         
         digitalWrite(RELAY_PIN,HIGH);
         current_relay_state=RELAY_CONNECTED;
         relay_open_timestamp=millis()/1000;
+
+        green_led.on();
+
         return relay_open_timestamp;
     } else {
-        
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("Disconnecting relay!");
-        #endif
+
+        Log.info("Disconnecting relay!");
         
         digitalWrite(RELAY_PIN,LOW);
         current_relay_state=RELAY_DISCONNECTED;
+        green_led.off();
+
         return ((millis()/1000) - relay_open_timestamp);
     }
 }
@@ -398,9 +388,7 @@ bool tag_found(uint8_t *buf,uint32_t *tag){
     
 
     while(Serial1.available()){
-        #ifdef DEBUG_JKW_MAIN
-            Serial.println("Check tag serial1!");
-        #endif
+        Log.info("Check tag serial1!");
         
         // if we haven't received input for a long time, make sure that we writing to pos 1
         if(abs((int)(millis()-last_tag_read))>(int)100){
@@ -413,13 +401,10 @@ bool tag_found(uint8_t *buf,uint32_t *tag){
         buf[currentTagIndex]=temp;
         currentTagIndex=(currentTagIndex+1)%TAGSTRINGSIZE;
 
-#ifdef DEBUG_JKW_MAIN
         if (temp > 0)
         {
-            Serial.print("serial1 card reader read ");
-            Serial.println(temp);
+            Log.info("Check tag serial1! serial1 card reader read %d", temp);
         }
-#endif
         
         if(currentTagIndex==0){
             //Serial.flush(); // flush it, as we just want to read this tag
@@ -429,12 +414,10 @@ bool tag_found(uint8_t *buf,uint32_t *tag){
             while(Serial1.available()){
                 temp=Serial1.read();
 
-#ifdef DEBUG_JKW_MAIN
                 if (temp > 0) {
-                    Serial.print("serial1 read flush ");
-                    Serial.println(temp);
+                    Log.info("serial1 read flush %d ", temp);
                 }
-#endif
+ 
             }
             
             return validate_tag(buf,tag);
@@ -461,10 +444,7 @@ bool validate_tag(uint8_t *buf,uint32_t *tag){
         // avoid noise - if tag is 0 move on, it can't be valid
         if (*tag > 0)
         {
-            #ifdef DEBUG_JKW_MAIN
-                Serial.print("Have card key tag!");
-                Serial.println(*tag);
-            #endif
+            Log.info("Have card key tag! %lu", *tag);
 
             return true;
         }
@@ -479,9 +459,7 @@ bool validate_tag(uint8_t *buf,uint32_t *tag){
 // if we are running offline
 bool read_EEPROM(){
     
-    #ifdef DEBUG_JKW_MAIN_SETUP
-    Serial.println("-- This is EEPROM read --");
-    #endif
+    Log.info("-- This is EEPROM read --");
     
     uint8_t temp;
     uint16_t num_keys=0;
@@ -490,24 +468,15 @@ bool read_EEPROM(){
     temp=EEPROM.read(KEY_NUM_EEPROM_HIGH);
     num_keys=temp<<8;
     temp=EEPROM.read(KEY_NUM_EEPROM_LOW);
-    num_keys+=temp;
-      
-    
-    #ifdef DEBUG_JKW_MAIN_SETUP
-    Serial.print("# of keys =");
-    Serial.println(num_keys);
-    #endif
-    
+    num_keys+=temp;      
+
+    Log.info("# of keys = %d", num_keys);   
     
     temp=EEPROM.read(KEY_CHECK_EEPROM_HIGH);
     num_keys_check=temp<<8;
     temp=EEPROM.read(KEY_CHECK_EEPROM_LOW);
     num_keys_check+=temp;
     
-    #ifdef DEBUG_JKW_MAIN_SETUP
-    Serial.print("# of keys+1 =");
-    Serial.println(num_keys_check);
-    #endif
     
     if(num_keys_check==num_keys+1){
         keys_available=num_keys;
@@ -520,20 +489,11 @@ bool read_EEPROM(){
             keys[i]+=temp<<8;
             temp=EEPROM.read(i*4+3);
             keys[i]+=temp;
-            
-            #ifdef DEBUG_JKW_MAIN_SETUP
-            Serial.print("Read key ");
-            Serial.print(i);
-            Serial.print("=");
-            Serial.print(keys[i]);
-            Serial.println(" from eeprom");
-            #endif
+
+            Log.info("Read key %d = %lu from eeprom", i, keys[i]);
+
         }
     }
-    
-    #ifdef DEBUG_JKW_MAIN_SETUP
-    Serial.println("-- End of EEPROM read --");
-    #endif
 
     return true;
 }
@@ -544,7 +504,6 @@ bool read_EEPROM(){
 // called if all else fails, returns if there is a hit
 bool check_db_for_one_tag(int currentTag)
 {
-
     if (currentTag <= 0) {
         return false;
     }
@@ -552,30 +511,20 @@ bool check_db_for_one_tag(int currentTag)
     // Let's not do this too often though
     if((last_badge_fallback_update+MIN_UPDATE_TIME) > millis()/1000   ){
         
-        #ifdef DEBUG_JKW_MAIN
-        Serial.print("check_db_for_one_tag read skipped, too frequent ");
-                Serial.print(last_badge_fallback_update);
-        Serial.print(" millis/1000 ");
-                Serial.println(millis()/1000);
-
-        #endif
+        Log.warn("check_db_for_one_tag read skipped, too frequent ");
         
         return false;
     }
 
-    #ifdef DEBUG_JKW_MAIN
-    Serial.println("check_db_for_one_tag key tag not in memory, trying direct DB service call");
-    #endif
+    Log.info("check_db_for_one_tag key tag not in memory, trying direct a DB service call");
     
     // well need a connection too
     if(!is_wifi_connected()){
         
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("no wifi connection");
-        #endif
+        Log.warn("no wifi connection, can't make DB check for tag, tag wasn't found in memory");
         
         if(!set_macs_login(&green_led,&red_led)){
-            set_connected(NOT_CONNECTED,true);
+            set_wifi_connected(NOT_CONNECTED,true);
             return false;
         }
     }
@@ -595,13 +544,11 @@ bool check_db_for_one_tag(int currentTag)
     if(response.body.length()==0){
         db_led.off(); // turn the led off
         
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("Empty response");
-        #endif
+        Log.info("Empty http response to tag check");
     }
 
     // connection looks good
-    set_connected(CONNECTED,true); // force update LEDs as the reconnect might have overwritten the LED mode
+    set_wifi_connected(CONNECTED,true); // force update LEDs as the reconnect might have overwritten the LED mode
     uint16_t current_key=0;  // not really used - yet
     uint16_t returned_key=0;
 
@@ -615,23 +562,14 @@ bool check_db_for_one_tag(int currentTag)
             // find end of array... 
             if(current_key<MAX_KEYS){
 
-                #ifdef  DEBUG_JKW_MAIN_SETUP
-                Serial.print("write:");
-                Serial.println(current_key*4+3);
-                #endif
+                Log.info("got new key, write: %d", current_key*4+3);
+                Log.info("check_db_for_one_tag key returnc from DB %d actual tag is %d", returned_key, currentTag);
 
 // check match here..
 
-                        Serial.print("check_db_for_one_tag key returnc from DB " );
-                        Serial.print(returned_key);
-                        Serial.print(" checking for match to ");
-                        Serial.println(currentTag);
-
-
                 if (currentTag == returned_key) {
-                    #ifdef DEBUG_JKW_MAIN
-                        Serial.println("check_db_for_one_tag Found key tag in response");
-                    #endif
+                    Log.info("check_db_for_one_tag Found key tag in response, yay");
+
                     return true;
                 }
                 returned_key = 0; // next - if any 
@@ -659,22 +597,18 @@ bool update_ids(bool forced){
     system_tick_t now;
     // avoid flooding
     if(last_key_update+MIN_UPDATE_TIME>millis()/1000 && last_key_update>0){
-        
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("db service read blocked, too frequent");
-        #endif
+
+        Log.warn("db service read blocked, too frequent:updateIDS");
         
         return false;
     }
     
-    if(!is_wifi_connected()){
-        
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("no ping");
-        #endif
+    if(!is_wifi_connected()){        
+
+        Log.warn("no ping, wifi not connected");
         
         if(!set_macs_login(&green_led,&red_led)){
-            set_connected(NOT_CONNECTED,true);
+            set_wifi_connected(NOT_CONNECTED,true);
             return false;
         }
     }
@@ -690,41 +624,25 @@ bool update_ids(bool forced){
     } else {
         request.path=request.path+"0";
     }
-    
-    
+        
     green_led.on();
-    red_led.on();
-    
+    red_led.on();    
     
     // Get request
     http.get(request, response, headers);
     int statusCode = response.status;
     green_led.resume();
     red_led.resume();
+
+    Log.info("DB web server call took %lu ms, request: %s body %s", (millis()-now), request.path.c_str(), response.body.c_str());
     
-    #ifdef DEBUG_JKW_MAIN
-    Serial.print("db request took ");
-    Serial.print(millis()-now);
-    Serial.println(" ms");
-    delay(1000);
-    Serial.println("Requested:");
-    Serial.println(request.path);
-    delay(1000);
-    Serial.println("Recevied:");
-    Serial.println(response.body);
-    #endif
-    
-    
+   
     // check status
     if(statusCode!=200){
         db_led.off(); // turn the led off
-        set_connected(NOT_CONNECTED, true);
+        set_wifi_connected(NOT_CONNECTED, true);
 
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("No response from server");
-        #endif
-        
-        Serial.println("No response from server");
+        Log.warn("No response from server");
         
         return false;
     }
@@ -733,13 +651,11 @@ bool update_ids(bool forced){
     if(response.body.length()==0){
         db_led.off(); // turn the led off
         
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("Empty response");
-        #endif
+        Log.info("Empty response");
     }
 
     // connection looks good
-    set_connected(CONNECTED,true); // force update LEDs as the reconnect might have overwritten the LED mode
+    set_wifi_connected(CONNECTED, true); // force update LEDs as the reconnect might have overwritten the LED mode
     
     // check if we've received a "no update" message from the server
     // if we are unforced we'll just leave our EEPROM as is.
@@ -752,12 +668,11 @@ bool update_ids(bool forced){
     if(!forced && response.body.length()>=2){
         if(response.body.charAt(0)=='n' && response.body.charAt(1)=='u'){
             // we received a 'no update'
-            
-            #ifdef DEBUG_JKW_MAIN
-            Serial.println("No update received");
-            #endif
+
+            Log.info("No update received");
+         
             b.try_fire();
-            db_led.off(); // turn the led off
+            //db_led.off(); // turn the led off
             return true;
         }
     }
@@ -771,15 +686,11 @@ bool update_ids(bool forced){
 
     //FLASH_Unlock();
     for(uint16_t i=0;i<response.body.length();i++){
-        Serial.print(response.body.charAt(i));
-
+ 
         if(response.body.charAt(i)==','){
             if(current_key<MAX_KEYS){
 
-                #ifdef  DEBUG_JKW_MAIN_SETUP
-                Serial.print("write:");
-                Serial.println(current_key*4+3);
-                #endif
+                Log.info("write key: %u" , current_key*4+3);
 
                 // store to EEPROM
                 EEPROM.update(current_key*4+0, (keys[current_key]>>24)&0xff);
@@ -795,31 +706,21 @@ bool update_ids(bool forced){
     }
     keys_available=current_key;
     
-    
     // log number of keys to the eeprom
-    #ifdef  DEBUG_JKW_MAIN_SETUP
-    Serial.print("write:");
-    Serial.println(KEY_NUM_EEPROM_LOW);
-    #endif
-    
+  
     EEPROM.update(KEY_NUM_EEPROM_HIGH,(keys_available>>8)&0xff);
     EEPROM.update(KEY_NUM_EEPROM_LOW,(keys_available)&0xff);
     // checksum
     
-    #ifdef  DEBUG_JKW_MAIN_SETUP
-    Serial.print("write:");
-    Serial.println(KEY_CHECK_EEPROM_LOW);
-    #endif
 
     EEPROM.update(KEY_CHECK_EEPROM_HIGH,((keys_available+1)>>8)&0xff);
     EEPROM.update(KEY_CHECK_EEPROM_LOW,((keys_available+1))&0xff);
-    //FLASH_Lock();
-    
+    //FLASH_Lock();    
+
+    Log.info("Total received keys for my id(%d) available %d", get_my_id(), keys_available);
+
+
     #ifdef DEBUG_JKW_MAIN_SETUP
-    Serial.print("Total received keys for my id(");
-    Serial.print(get_my_id());
-    Serial.print("):");
-    Serial.println(keys_available);
     for(uint16_t i=0;i<keys_available;i++){
         Serial.print("Valid Database Key Nr ");
         Serial.print(i+1);
@@ -851,14 +752,13 @@ bool fire_report(uint8_t event,uint32_t badge,uint32_t extrainfo){
 
     if(!is_wifi_connected()){
     
-        #ifdef DEBUG_JKW_MAIN
-        Serial.println("no ping");
-        #endif
+        Log.warn("no wifi ping, cant report");
+
         
         if(set_macs_login(&green_led,&red_led)){
-            set_connected(CONNECTED, true); // this could potentially destroy our LED pattern? TODO
+            set_wifi_connected(CONNECTED, true); // this could potentially destroy our LED pattern? TODO
         } else {
-            set_connected(NOT_CONNECTED, true);
+            set_wifi_connected(NOT_CONNECTED, true);
             return false; // pointless to go on
         }
     }
@@ -876,10 +776,7 @@ bool fire_report(uint8_t event,uint32_t badge,uint32_t extrainfo){
         return false;
     }
     
-    #ifdef DEBUG_JKW_MAIN
-    Serial.print("calling:");
-    Serial.println(request.path);
-    #endif
+    Log.info("calling: %s", request.path.c_str());
 
     now = millis();
     green_led.on();
@@ -891,17 +788,13 @@ bool fire_report(uint8_t event,uint32_t badge,uint32_t extrainfo){
     
     
     if(statusCode==200){
-        set_connected(CONNECTED, true);
+        set_wifi_connected(CONNECTED, true);
     } else if(statusCode!=200){
-        set_connected(NOT_CONNECTED, true);
+        set_wifi_connected(NOT_CONNECTED, true);
         ret=false;
     }
     
-    #ifdef DEBUG_JKW_MAIN
-    Serial.print("db request took ");
-    Serial.print(millis()-now);
-    Serial.println(" ms");
-    #endif
+    Log.info("report db request took %lu ms", millis()-now );
     
     db_led.off(); // turn the led off
     return ret;
@@ -911,17 +804,17 @@ bool fire_report(uint8_t event,uint32_t badge,uint32_t extrainfo){
 //////////////////////////////// SET CONNECTED ////////////////////////////////
 // set the LED pattern 
 void set_connected(int status){
-    set_connected(status,false);
+    set_wifi_connected(status,false);
 };
 
 // Connected to wifi and getting server responses 
-void set_connected(int status, bool force){
-    if(status==1 && (connected==0 || force)){
-        connected=1;
+void set_wifi_connected(int status, bool force){
+    if(status==CONNECTED && (connected==NOT_CONNECTED || force)){
+        connected=CONNECTED;
         green_led.blink();
         red_led.off();
-    } else if(status==0 && (connected==1 || force)){
-        connected=0;
+    } else if(status==NOT_CONNECTED && (connected==CONNECTED || force)){
+        connected=NOT_CONNECTED;
         green_led.off();
         red_led.blink();
     }
@@ -934,12 +827,10 @@ void set_connected(int status, bool force){
 // will only do the interation with the pins once for performance
 uint8_t get_my_id(){
     if(id==(uint8_t)-1){
-        id=0;
-        
-        #ifdef DEBUG_JKW_MAIN
-        Serial.print("ID never set, reading");
-        #endif
-        
+        id=0;        
+
+        Log.info("ID never set, reading");
+
         for(uint8_t i=10+MAX_JUMPER_PIN; i>=10; i--){   // A0..7 is 10..17
             id=id<<1;
             if(!digitalRead(i)){
@@ -947,10 +838,7 @@ uint8_t get_my_id(){
             };
         }
         
-        #ifdef DEBUG_JKW_MAIN
-        Serial.print(" id for this device as ");
-        Serial.println(id);
-        #endif
+        Log.info(" id for this device as %d ", id);
         
     }
     return id;

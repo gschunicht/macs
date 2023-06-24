@@ -4,14 +4,54 @@ please refere to http://koljawindeler.github.io/macs
 Geoff notes
 
 LED info
-               // 1. assuming that we are NOT connected, we reached this point and the create_report has success to reconnet than it will call set_connected()
-                // this will turn red off (which is fine (was blinking = not connected)) and green to blink (ok), so we have to override it
-                // 2. assuming that we are NOT connected, we reached this point and the create_report has NO success to reconnet than it will not call set_connected()
-                // the red will keep blinking (ok) but we still want to show that this card was good, turn green on
-                // 3. assuming that we are connected, we reached this point then create_report will not try to reconnect and the report is send just fine
-                // the red will be off anywa (ok), we want to show that this card was good, turn green on
-                // 4. assuming that we are connected, we reached this point then create_report will not try to reconnect, but the report failed, create_report will set us to not conneted
-                // the red will be blinkin (ok), we want to show that this card was good, turn green on
+	//	if we have a blank device this will happen:
+	//	1. Both LEDs will toggle for 10sec (saving WiFi credentials (not applicable here) or waiting for input)
+	//
+	//	if we have a config that is OUT of reach:
+	//	1. (MACS=Both LEDs)/(UPDATE1=green LED)/(UPDATE2=red LED) will flash 3x (MACS=simultaneously) to show that the config has been read
+	//	2. Green off, red on will show the start of the WiFi scanning
+	//	3. per WiFi that has been found the green and red will toggle, just to show activity
+	// 	4. Both LEDs are switched off
+	//	5. Both LEDs will toggle for 10sec (saving WiFi credentials (not applicable here) or waiting for input) 20Hz
+	//
+	//	if we have a config that is IN reach:
+	//	1. (MACS=Both LEDs)/(UPDATE1=green LED)/(UPDATE2=red LED) will flash 3x (MACS=simultaneously) to show that the config has been read
+	//	2. Green off, red on will show the start of the WiFi scanning
+	//	3. per WiFi that has been found the green and red will toggle, just to show activity
+	// 	4. Both LEDs are switched off
+	//	5. (MACS=Both LEDs)/(UPDATE1=green LED)/(UPDATE2=red LED) will toggle 5x (WiFi found) 10Hz
+	//	6. Both LEDs will toggle for 10sec or until WiFi data are saved (saving WiFi credentials or waiting for input) 20Hz
+	//	7. (MACS=Both LEDs)/(UPDATE1=green LED)/(UPDATE2=red LED) will toggle 2x (WiFi connected) 10Hz
+
+  
+
+  // GS: Connected to Wifi, no card, red blink
+  // Connected, bad card - ** Solid Red **
+  // Connected, good card, Green  + Red Blink
+
+  // Not Connected - Blink both ??
+
+
+  
+  // 1. assuming that we are NOT connected, we reached this point and the create_report has success to reconnet than it will call set_connected()
+  // this will turn red off (which is fine (was blinking = not connected)) and green to blink (ok), so we have to override it
+  // 2. assuming that we are NOT connected, we reached this point and the create_report has NO success to reconnet than it will not call set_connected()
+  // the red will keep blinking (ok) but we still want to show that this card was good, turn green on
+  // 3. assuming that we are connected, we reached this point then create_report will not try to reconnect and the report is send just fine
+  // the red will be off anywa (ok), we want to show that this card was good, turn green on
+  // 4. assuming that we are connected, we reached this point then create_report will not try to reconnect, but the report failed, create_report will set us to not conneted
+  // the red will be blinkin (ok), we want to show that this card was good, turn green on
+
+The Serial port can be used to update Wifi - write to it:
+    // buffer is 64 byte (id(1)+<tab>+SSID(20)+<tab>+pw(20)+<tab>+type(1)+<tab>+chk(1)+<tab>)=48
+    // e.g. 00 09 6d 61 63 73 09 36 32 31 35 30 32 37 30 39 34 09 03 09 17 09
+    // e.g. 01 09 61 6a 6c 6f 6b 65 72 74 09 71 77 65 71 77 65 71 77 65 09 03 09 60 09
+    // e.g. 02 09 73 68 6f 70 09 61 62 63 64 65 66 67 68 09 02 09 0E 09
+        //   type=3; // wpa2 ;
+             type=2; // wpa
+             chk, simple checksum
+
+
 
 
 particle serial wifi --file <config file>
