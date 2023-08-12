@@ -390,7 +390,8 @@ bool is_wifi_connected(){
 
     if (WiFi.ready())
     {
-        Serial.print("Odd no ping but is REady ");  
+        Serial.print("Odd no ping but is REady, ping disabled on router maybe "); 
+        return true; 
     }
 
     return false;

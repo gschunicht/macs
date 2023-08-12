@@ -49,11 +49,11 @@ uint32_t currentTag=-1;
 uint8_t current_relay_state=RELAY_DISCONNECTED;
 uint8_t id=-1; //255, my own id
 uint8_t tagInRange=0;
-uint32_t last_key_update=0;
-uint32_t last_badge_fallback_update=0;
-uint32_t last_server_request=0;
-uint32_t relay_open_timestamp=0;
-uint32_t last_tag_read=0;
+system_tick_t last_key_update_ms=0;
+system_tick_t last_badge_fallback_update_ms=0;
+system_tick_t last_server_request=0;
+system_tick_t relay_open_timestamp=0;
+system_tick_t last_tag_read_ms=0;
 
 LED db_led(DB_LED_AND_UPDATE_PIN,DB_LED_DELAY,1,1); // weak + inverse
 LED red_led(RED_LED_PIN,RED_LED_DELAY,0,0);
@@ -320,7 +320,7 @@ void loop() {
     }
     
     // time based update the storage from the server (every 10 min?) 
-    if(last_key_update+DB_UPDATE_TIME<(millis()/1000)){
+    if((last_key_update_ms+DB_UPDATE_TIME_MS)<millis()){
         update_ids(false);  // unforced upate
     }
     
@@ -388,13 +388,13 @@ bool tag_found(uint8_t *buf,uint32_t *tag){
     
 
     while(Serial1.available()){
-        Log.info("Check tag serial1!");
+        Log.info("Check tag, read serial1 port !");
         
         // if we haven't received input for a long time, make sure that we writing to pos 1
-        if(abs((int)(millis()-last_tag_read))>(int)100){
+        if(abs((int)(millis()-last_tag_read_ms))>(int)100){
             currentTagIndex=0;
         }
-        last_tag_read=millis();
+        last_tag_read_ms=millis();
         
         // read and store
         temp=Serial1.read();
@@ -403,7 +403,7 @@ bool tag_found(uint8_t *buf,uint32_t *tag){
 
         if (temp > 0)
         {
-            Log.info("Check tag serial1! serial1 card reader read %d", temp);
+            Log.info("Check tag serial1 port! serial1 card reader read %d", temp);
         }
         
         if(currentTagIndex==0){
@@ -509,9 +509,9 @@ bool check_db_for_one_tag(int currentTag)
     }
 
     // Let's not do this too often though
-    if((last_badge_fallback_update+MIN_UPDATE_TIME) > millis()/1000   ){
+    if((last_badge_fallback_update_ms+MIN_UPDATE_TIME_MS) > millis()   ){
         
-        Log.warn("check_db_for_one_tag read skipped, too frequent ");
+        Log.warn("check_db_for_one_tag read skipped, too frequent %lu now %lu ", last_badge_fallback_update_ms,  millis()  );
         
         return false;
     }
@@ -541,32 +541,29 @@ bool check_db_for_one_tag(int currentTag)
     red_led.resume();
 
     // check length
-    if(response.body.length()==0){
+    if(response.body.length()==0 || statusCode != 200){
         db_led.off(); // turn the led off
         
-        Log.info("Empty http response to tag check");
+        Log.info("Empty http response or not HTTP OK for single tag check");
     }
+
+    Log.info("Single tag check response body is [%s] ", response.body.c_str());
 
     // connection looks good
     set_wifi_connected(CONNECTED,true); // force update LEDs as the reconnect might have overwritten the LED mode
-    uint16_t current_key=0;  // not really used - yet
-    uint16_t returned_key=0;
+    uint32_t current_key_pos=0;  // not really used - yet
+    uint32_t returned_key=0;
 
     // currently will not append to the in memory array.
 
     for(uint16_t i=0;i<response.body.length();i++){
-        Serial.print(response.body.charAt(i));
-
         if(response.body.charAt(i)==','){
 
             // find end of array... 
-            if(current_key<MAX_KEYS){
+            if(current_key_pos<MAX_KEYS){
+                Log.info("check_db_for_one_tag key return from DB server  %lu actual tag is %d", returned_key, currentTag);
 
-                Log.info("got new key, write: %d", current_key*4+3);
-                Log.info("check_db_for_one_tag key returnc from DB %d actual tag is %d", returned_key, currentTag);
-
-// check match here..
-
+                // check match here..
                 if (currentTag == returned_key) {
                     Log.info("check_db_for_one_tag Found key tag in response, yay");
 
@@ -576,10 +573,12 @@ bool check_db_for_one_tag(int currentTag)
             }
         } else if(response.body.charAt(i)>='0' && response.body.charAt(i)<='9') { // zahl
             returned_key=returned_key*10+(response.body.charAt(i)-'0');
+            Log.info("check_db_for_one_tag parsing %lu actual tag is %d", returned_key, response.body.charAt(i));
+
         }
     }
 
-    last_badge_fallback_update = millis()/1000;
+    last_badge_fallback_update_ms = millis();
     
     return false; 
 
@@ -595,10 +594,12 @@ bool check_db_for_one_tag(int currentTag)
 // false if not - you might want to set a LED if it returns false
 bool update_ids(bool forced){
     system_tick_t now;
-    // avoid flooding
-    if(last_key_update+MIN_UPDATE_TIME>millis()/1000 && last_key_update>0){
 
-        Log.warn("db service read blocked, too frequent:updateIDS");
+    now = millis();
+    // avoid flooding
+    if((last_key_update_ms+ MIN_UPDATE_TIME_MS) > now && last_key_update_ms>0){
+
+        Log.warn("db service read blocked, too frequent:updateIDS, last ms %lu now %lu ",last_key_update_ms, now);
         
         return false;
     }
@@ -612,9 +613,8 @@ bool update_ids(bool forced){
             return false;
         }
     }
-    
-    last_key_update=millis()/1000;
-    now = millis();
+
+
     db_led.on(); // turn the led on
     
     // request data
@@ -634,7 +634,7 @@ bool update_ids(bool forced){
     green_led.resume();
     red_led.resume();
 
-    Log.info("DB web server call took %lu ms, request: %s body %s", (millis()-now), request.path.c_str(), response.body.c_str());
+    Log.info("DB web server call took %lu ms, status %d request: %s body %s", (millis()-now), statusCode, request.path.c_str(), response.body.c_str());
     
    
     // check status
@@ -676,10 +676,12 @@ bool update_ids(bool forced){
             return true;
         }
     }
+        
+    last_key_update_ms=now;
     
     // clear all existing keys and then, import keys from request
     keys_available=0;
-    uint16_t current_key=0;
+    uint16_t current_key_pos=0;
     for(uint16_t i=0;i<sizeof(keys)/sizeof(keys[0]);i++){
         keys[i]=0;
     }
@@ -688,23 +690,23 @@ bool update_ids(bool forced){
     for(uint16_t i=0;i<response.body.length();i++){
  
         if(response.body.charAt(i)==','){
-            if(current_key<MAX_KEYS){
+            if(current_key_pos<MAX_KEYS){
 
-                Log.info("write key: %u" , current_key*4+3);
+                Log.info("write key: %u" , current_key_pos*4+3);
 
                 // store to EEPROM
-                EEPROM.update(current_key*4+0, (keys[current_key]>>24)&0xff);
-                EEPROM.update(current_key*4+1, (keys[current_key]>>16)&0xff);
-                EEPROM.update(current_key*4+2, (keys[current_key]>>8)&0xff);
-                EEPROM.update(current_key*4+3, (keys[current_key])&0xff);
+                EEPROM.update(current_key_pos*4+0, (keys[current_key_pos]>>24)&0xff);
+                EEPROM.update(current_key_pos*4+1, (keys[current_key_pos]>>16)&0xff);
+                EEPROM.update(current_key_pos*4+2, (keys[current_key_pos]>>8)&0xff);
+                EEPROM.update(current_key_pos*4+3, (keys[current_key_pos])&0xff);
             
-                current_key++;
+                current_key_pos++;
             }
         } else if(response.body.charAt(i)>='0' && response.body.charAt(i)<='9') { // zahl
-            keys[current_key]=keys[current_key]*10+(response.body.charAt(i)-'0');
+            keys[current_key_pos]=keys[current_key_pos]*10+(response.body.charAt(i)-'0');
         }
     }
-    keys_available=current_key;
+    keys_available=current_key_pos;
     
     // log number of keys to the eeprom
   

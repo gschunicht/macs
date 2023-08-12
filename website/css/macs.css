@@ -1,0 +1,18 @@
+
+body {
+	background-image: url("../images/bg2.jpg");
+	background-color: #4C4C4C;
+}
+
+span.menuLeft {
+	float:left;
+}
+
+span.menuRight {
+	float:right;
+}
+
+span.menuRight em,
+span.menuLeft em {
+	margin:2px;
+}

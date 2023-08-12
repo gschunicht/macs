@@ -78,12 +78,12 @@
 //#define DEBUG_JKW_WIFI  1
 
 // settings
-#define DB_UPDATE_TIME          10*60 // seconds between two auto updates from the server
-#define MIN_UPDATE_TIME         30 // seconds between two database request, to avoid flooding, remember this has to be smaller then db_update_time
+#define DB_UPDATE_TIME_MS       10*60*1000 // mseconds between two force updates from the server, 10 min here
+#define MIN_UPDATE_TIME_MS      30*1000 // seconds between two database request, to avoid flooding, remember this has to be smaller then db_update_time
 #define RED_LED_DELAY           1000 // ms
 #define GREEN_LED_DELAY         1000 // ms
 #define DB_LED_DELAY            1000 // ms
-#define SEC_WAIT_BOOTUP         5 // 5sec of led toggling to show that we are starting
+#define SEC_WAIT_BOOTUP_SEC     5 // 5sec of led toggling to show that we are starting
 
 // network
 #define HOSTPORT 80

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<style>
+			table.blueTable {
+			  border: 1px solid #1C6EA4;
+			  background-color: #EEEEEE;
+			  width: 100%;
+			  max-width:800px;
+			  text-align: left;
+			  border-collapse: collapse;
+			}
+			table.blueTable td, table.blueTable th {
+			  border: 1px solid #AAAAAA;
+			  padding: 3px 2px;
+			}
+			table.blueTable tbody td {
+			  font-size: 13px;
+			}
+			table.blueTable tr:nth-child(even) {
+			  background: #D0E4F5;
+			}
+			table.blueTable thead {
+			  background: #1C6EA4;
+			  background: -moz-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+			  background: -webkit-linear-gradient(top, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+			  background: linear-gradient(to bottom, #5592bb 0%, #327cad 66%, #1C6EA4 100%);
+			  border-bottom: 2px solid #444444;
+			}
+			table.blueTable thead th {
+			  font-size: 15px;
+			  font-weight: bold;
+			  color: #FFFFFF;
+			  border-left: 2px solid #D0E4F5;
+			}
+			table.blueTable thead th:first-child {
+			  border-left: none;
+			}
+
+			table.blueTable tfoot {
+			  font-size: 14px;
+			  font-weight: bold;
+			  color: #000000;
+			  background: #D0E4F5;
+			  background: -moz-linear-gradient(top, #dcebf7 0%, #d4e6f6 66%, #D0E4F5 100%);
+			  background: -webkit-linear-gradient(top, #dcebf7 0%, #d4e6f6 66%, #D0E4F5 100%);
+			  background: linear-gradient(to bottom, #dcebf7 0%, #d4e6f6 66%, #D0E4F5 100%);
+			  border-top: 2px solid #444444;
+			}
+			table.blueTable tfoot td {
+			  font-size: 14px;
+			}
+			table.blueTable tfoot .links {
+			  text-align: right;
+			}
+			table.blueTable tfoot .links a{
+			  display: inline-block;
+			  background: #1C6EA4;
+			  color: #FFFFFF;
+			  padding: 2px 8px;
+			  border-radius: 5px;
+			}
+			font.tableName {
+			  color: #4488FF;
+			  font-weight: bold;
+			}
+			th:nth-child(1) {align:left; width:15%;}
+			th:nth-child(2) {align:left; width:10%;}
+			th:nth-child(3) {align:left; width:10%;}
+			th:nth-child(4) {align:left; width:65%;}
+		</style>
+	</head>
+	<body>
+		<table class="blueTable">
+			<thead>
+				<tr >
+					<th align="center" colspan="4">Table Name: <b>access</b></th>
+				</tr>
+			</thead>
+			<tfoot>
+				<tr>
+					<td align="left" colspan="4">Notes: </td>
+				</tr>
+			</tfoot>
+			<tbody>
+				<tr >
+					<th>Column</th><th>Type</th><th>NULL</th><th>Description</th>
+				</tr>
+				<tr>
+					<td>id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>primary key, auto-increment</td>
+				</tr>
+				<tr>
+					<td>user_id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>foreign key to <b>user</b> table</td>
+				</tr>
+				<tr style="border: 1px solid #98bf21">
+					<td>mach_id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>foreign key to <b>mach</b> table</td>
+				</tr>
+			</tbody>
+		</table>
+		<table class="blueTable">
+			<thead>
+				<tr >
+					<th align="center" colspan="4">Table Name: <b>log</b></th>
+				</tr>
+			</thead>
+			<tfoot>
+				<tr>
+					<td align="left" colspan="4">Notes: </td>
+				</tr>
+			</tfoot>
+			<tbody>
+				<tr >
+					<th>Column</th><th>Type</th><th>NULL</th><th>Description</th>
+				</tr>
+				<tr>
+					<td>id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>primary key, auto-increment</td>
+				</tr>
+				<tr>
+					<td>timestamp</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>unix/epoch timestamp</td>
+				</tr>
+				<tr>
+					<td>user_id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>foreign key to <b>user</b> table</td>
+				</tr>
+				<tr style="border: 1px solid #98bf21">
+					<td>mach_id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>foreign key to <b>mach</b> table</td>
+				</tr>
+				<tr>
+					<td>event</td>
+					<td>text</td>
+					<td>no</td>
+					<td>description of activity being logged</td>
+				</tr>
+				<tr style="border: 1px solid #98bf21">
+					<td>login_id</td>
+					<td>int(11)</td>
+					<td>yes</td>
+					<td>default NULL; foreign key to <b>user</b> table</td>
+				</tr>
+				<tr>
+					<td>usage</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>time interval to capture useage time</td>
+				</tr>
+			</tbody>
+		</table>
+		<table class="blueTable">
+			<thead>
+				<tr >
+					<th align="center" colspan="4">Table Name: <b>mach</b></th>
+				</tr>
+			</thead>
+			<tfoot>
+				<tr>
+					<td align="left" colspan="4">Notes: </td>
+				</tr>
+			</tfoot>
+			<tbody>
+				<tr >
+					<th>Column</th><th>Type</th><th>NULL</th><th>Description</th>
+				</tr>
+				<tr>
+					<td>id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>primary key, auto-increment</td>
+				</tr>
+				<tr>
+					<td>name</td>
+					<td>text</td>
+					<td>no</td>
+					<td>short name of machine</td>
+				</tr>
+				<tr>
+					<td>mach_nr</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>?</td>
+				</tr>
+				<tr>
+					<td>desc</td>
+					<td>text</td>
+					<td>no</td>
+					<td>descripton of machine</td>
+				</tr>
+				<tr>
+					<td>last_seen</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>unix/epoch timestamp</td>
+				</tr>
+				<tr>
+					<td>active</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>?</td>
+				</tr>
+				<tr>
+					<td>version</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>default to -1</td>
+				</tr>
+			</tbody>
+		</table>
+		<table class="blueTable">
+			<thead>
+				<tr >
+					<th align="center" colspan="4">Table Name: <b>update_available</b></th>
+				</tr>
+			</thead>
+			<tfoot>
+				<tr>
+					<td align="left" colspan="4">Notes: </td>
+				</tr>
+			</tfoot>
+			<tbody>
+				<tr >
+					<th>Column</th><th>Type</th><th>NULL</th><th>Description</th>
+				</tr>
+				<tr>
+					<td>id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>primary key, auto-increment</td>
+				</tr>
+				<tr>
+					<td>mach_id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>foreign key to <b>mach</b> table</td>
+				</tr>
+			</tbody>
+		</table>
+		<table class="blueTable">
+			<thead>
+				<tr >
+					<th align="center" colspan="4">Table Name: <b>user</b></th>
+				</tr>
+			</thead>
+			<tfoot>
+				<tr>
+					<td align="left" colspan="4">Notes: </td>
+				</tr>
+			</tfoot>
+			<tbody>
+				<tr >
+					<th>Column</th><th>Type</th><th>NULL</th><th>Description</th>
+				</tr>
+				<tr>
+					<td>id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>primary key, auto-increment</td>
+				</tr>
+				<tr>
+					<td>name</td>
+					<td>text</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>login</td>
+					<td>text</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>hash</td>
+					<td>text</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>badge_id</td>
+					<td>text</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>email</td>
+					<td>text</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>last_seen</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>active</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+			</tbody>
+		</table>
+		<table class="blueTable">
+			<thead>
+				<tr >
+					<th align="center" colspan="4">Table Name: <b>wifi</b></th>
+				</tr>
+			</thead>
+			<tfoot>
+				<tr>
+					<td align="left" colspan="4">Notes: </td>
+				</tr>
+			</tfoot>
+			<tbody>
+				<tr >
+					<th>Column</th><th>Type</th><th>NULL</th><th>Description</th>
+				</tr>
+				<tr>
+					<td>id</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>ssid</td>
+					<td>text</td>
+					<td>no</td>
+					<td>SSID of Wi-Fi AP</td>
+				</tr>
+				<tr>
+					<td>pw</td>
+					<td>text</td>
+					<td>no</td>
+					<td>password / key for Wi-Fi</td>
+				</tr>
+				<tr >
+					<td>type</td>
+					<td>int(11)</td>
+					<td>no</td>
+					<td>? value of 3 is valid ?</td>
+				</tr>
+			</tbody>
+		</table>
+	</body>
+</html>

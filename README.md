@@ -1,5 +1,9 @@
 please refere to http://koljawindeler.github.io/macs
 
+re-claim existing...
+see https://docs.particle.io/tools/device-restore/device-restore-usb/
+follow steps
+
 
 Geoff notes
 
@@ -197,4 +201,33 @@ Cnt       ID          Machine name
 149        34        Dewalt Sliding Compound Miter Saw (edited) 
 
 
+
+To re-flash bootloader do this:
+The bootloader seems to be invalid. If I’m not mistaken you should see version 101 not 2 with a system version 207 Download this bootloader binary https://github.com/particle-iot/firmware/releases/download/v0.7.0/bootloader-0.7.0-photon.bin and flash via Listening Mode 
+particle flash --serial bootloader-0.7.0-photon.bin
+
+-- data from MS particle.
+Device claimed: yes
+
+Device claimed: yes
+Waiting for the binary file to be sent ... (press 'a' to abort)
+CAborted by user.
+Your device id is 20003b000a47363339343638
+Your device MAC address is
+e0:4f:43:c2:e1:e0
+{"p":6,"m":[{"s":16384,"l":"m","vc":30,"vv":30,"f":"b","n":"0","v":11,"d":[]},{"s":262144,"l":"m","vc":30,"vv":30,"f":"s","n":"1","v":109,"d":[]},{"s":262144,"l":"m","vc":30,"vv":30,"f":"s","n":"2","v":109,"d":[{"f":"s","n":"1","v":109,"_":""}]},{"s":131072,"l":"m","vc":30,"vv":30,"u":"B3A6DCD529BE70FBE24EE959C7305D58E3BC9A04ACDCE8F093C7A1F759097D09","f":"u","n":"1","v":3,"d":[{"f":"s","n":"2","v":6,"_":""}]},{"s":131072,"l":"f","vc":30,"vv":0,"d":[]}]}
+system firmware version: 0.6.3
+
+SSID: macs
+Security 0=unsecured, 1=WEP, 2=WPA, 3=WPA2: 2
+Password: 6215027094
+Thanks! Wait while I save those credentials...
+
+Awesome. Now we'll connect!
+
+If you see a pulsing cyan light, your device
+has connected to the Cloud and is ready to go!
+
+If your LED flashes red or you encounter any other problems,
+visit https://www.particle.io/support to debug.
 

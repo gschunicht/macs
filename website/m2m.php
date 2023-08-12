@@ -43,13 +43,13 @@ if(isset($_GET["mach_nr"])){
 		}
 	}
 	else if($machine_known==1 && $updated ==0){
-		$stmt = $db->prepare("SELECT badge_id FROM `user` WHERE active=1 and id in (select user_id from access where mach_id=(select id from mach where mach_nr=:id))");
-	//	$stmt = $db->prepare("SELECT DISTINCT CAST(badge_id as DECIMAL) as badge_num  FROM access   Join  user on access.user_id=user.id  Join mach on access.mach_id=mach.id  WHERE mach.mach_nr = :id and user.active=1 order by badge_num");
+		//$stmt = $db->prepare("SELECT badge_id FROM `user` WHERE active=1 and id in (select user_id from access where mach_id=(select id from mach where mach_nr=:id))");
+		$stmt = $db->prepare("SELECT DISTINCT CAST(badge_id as DECIMAL) as badge_num  FROM access   Join  user on access.user_id=user.id  Join mach on access.mach_id=mach.id  WHERE mach.mach_nr = :id and user.active=1 order by user.last_seen desc, badge_num");
 		$stmt->bindParam(":id",$_GET["mach_nr"],PDO::PARAM_INT);
 		$stmt->execute();
 		$csv="";
 	        foreach($stmt as $row){
-			$csv.=intval($row["badge_id"],10).",";
+			$csv.=intval($row["badge_num"],10).",";
 		};
 		//echo $csv;
 		// update last seen

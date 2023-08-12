@@ -32,13 +32,17 @@
 				$user="0";
 			} else {
 				$user="";
-				$result = $link->query("SELECT `id` FROM  `macs`.`user` WHERE badge_id='".$_GET["badge"]."'");
+				$result = $link->query("SELECT `id` FROM  `macs`.`user` WHERE `badge_id` != '' AND CAST(badge_id as DECIMAL)=".$_GET["badge"]);
 				foreach($result as $row){
 					$user=$row["id"];
 				};
 				if($user==""){
 					$event.=" (badge#:".$_GET["badge"]." is unknown)";
 					$user="0";
+				} else {
+					$sqlcmd = "UPDATE `macs`.`user` set `last_seen` = UNIX_TIMESTAMP(NOW()) where `id` =".$row["id"] ;
+				
+					$result = $link->query($sqlcmd); //Execute the SQL command
 				};
 			}
 			//Log the activity to the database
