@@ -31,11 +31,9 @@
 #include "main.h"
 #include "SPI.h"
 
-// network the web server
-//IPAddress HOSTNAME(192,168,188,23);
-IPAddress HOSTNAME(192,168,3,102);
 
-uint32_t v=20230514;
+
+uint32_t v=20230515;
 
 uint8_t keys_available=0; // ho many keys are in the array in memory 
 uint32_t keys[MAX_KEYS];
@@ -69,6 +67,9 @@ http_header_t headers[] = {     { "Accept" , "*/*"},     { NULL, NULL } }; // NO
 http_request_t request;
 http_response_t response;
 
+// network the web server
+IPAddress MACS_WEBSERVER_IP(192,168,188,23);
+//IPAddress MACS_WEBSERVER_IP(192,168,3,102);
 
 ///
 
@@ -87,7 +88,9 @@ void setup() {
     pinMode(RELAY_PIN,OUTPUT);          // driver for the relay
     pinMode(TAG_IN_RANGE_INPUT,INPUT);
 
-    Log.info("Logging Startup");
+    delay(5000);
+
+    Log.info("Startup");
     
     // register system handles
     System.on(wifi_listen, listen);
@@ -108,7 +111,7 @@ void setup() {
     Serial.begin(9600);  // debug out
 
     // setup https client
-    request.ip = HOSTNAME;
+    request.ip = MACS_WEBSERVER_IP;
     request.port = HOSTPORT;
  
     
@@ -133,7 +136,7 @@ void setup() {
     } else {
         Log.info("- MACS - Update");
 
-       goto_update_mode();
+        goto_update_mode();
     }
 }
 //////////////////////////////// SETUP ////////////////////////////////
@@ -239,6 +242,11 @@ void loop() {
                 continue;
             }
 
+            if (tries == 2) {
+                //  just look to see if there is a recent update, eg new user/ access granted or removed
+                update_ids(false); // unforced update, let web service tell if new data
+            }
+
             // compares known keys, returns true if key is known
             if(access_test(currentTag)){
                 set_relay_state(RELAY_CONNECTED);
@@ -261,13 +269,10 @@ void loop() {
 
             tries--; 
 
-            update_ids(false); // unforced update
-            // above will just look to see if there is a recent update, eg new user/ access granted
-            // check if this one badge is in DB, a fallback if errors.
-
             // if we have a card that is not known to be valid we should maybe check our database
             Log.info("Card Key not valid, requesting update from server");
 
+            // check if this one badge is in DB, a fallback if errors.
             if (check_db_for_one_tag(currentTag))
             {
                 set_relay_state(RELAY_CONNECTED);
@@ -490,7 +495,7 @@ bool read_EEPROM(){
             temp=EEPROM.read(i*4+3);
             keys[i]+=temp;
 
-            Log.info("Read key %d = %lu from eeprom", i, keys[i]);
+            Log.trace("Read key %d = %lu from eeprom", i, keys[i]);
 
         }
     }
@@ -502,7 +507,7 @@ bool read_EEPROM(){
 // There were some buffer issues, see client.h 
 // This is a fallback that will force read one tag from the DB service
 // called if all else fails, returns if there is a hit
-bool check_db_for_one_tag(int currentTag)
+bool check_db_for_one_tag(uint32_t currentTag)
 {
     if (currentTag <= 0) {
         return false;
@@ -521,11 +526,13 @@ bool check_db_for_one_tag(int currentTag)
     // well need a connection too
     if(!is_wifi_connected()){
         
-        Log.warn("no wifi connection, can't make DB check for tag, tag wasn't found in memory");
+        Log.warn("no wifi connection, can't make DB check for tag, tag wasn't found in memory, make sure wifi is up");
         
         if(!set_macs_login(&green_led,&red_led)){
             set_wifi_connected(NOT_CONNECTED,true);
             return false;
+        } else {
+            set_wifi_connected(CONNECTED,true);
         }
     }
 
@@ -561,7 +568,7 @@ bool check_db_for_one_tag(int currentTag)
 
             // find end of array... 
             if(current_key_pos<MAX_KEYS){
-                Log.info("check_db_for_one_tag key return from DB server  %lu actual tag is %d", returned_key, currentTag);
+                Log.info("check_db_for_one_tag key return from DB server  %lu actual tag is %lu", returned_key, currentTag);
 
                 // check match here..
                 if (currentTag == returned_key) {
@@ -573,8 +580,6 @@ bool check_db_for_one_tag(int currentTag)
             }
         } else if(response.body.charAt(i)>='0' && response.body.charAt(i)<='9') { // zahl
             returned_key=returned_key*10+(response.body.charAt(i)-'0');
-            Log.info("check_db_for_one_tag parsing %lu actual tag is %d", returned_key, response.body.charAt(i));
-
         }
     }
 
@@ -599,21 +604,25 @@ bool update_ids(bool forced){
     // avoid flooding
     if((last_key_update_ms+ MIN_UPDATE_TIME_MS) > now && last_key_update_ms>0){
 
-        Log.warn("db service read blocked, too frequent:updateIDS, last ms %lu now %lu ",last_key_update_ms, now);
+        Log.warn("Skipping DB read, too frequent:updateIDS, last ms %lu now %lu ",last_key_update_ms, now);
         
         return false;
     }
     
     if(!is_wifi_connected()){        
 
-        Log.warn("no ping, wifi not connected");
+        Log.warn("updateKeys: wifi not connected, try to connect");
         
         if(!set_macs_login(&green_led,&red_led)){
             set_wifi_connected(NOT_CONNECTED,true);
             return false;
+        } else {
+            Log.warn("updateKeys: connection success, lets get data");
+            set_wifi_connected(CONNECTED,true);
+            delay(1000);
         }
-    }
 
+    }
 
     db_led.on(); // turn the led on
     
@@ -665,6 +674,8 @@ bool update_ids(bool forced){
     //Serial.print(response.charAt(0));
     //Serial.println(response.charAt(1));
     
+    last_key_update_ms=now;
+
     if(!forced && response.body.length()>=2){
         if(response.body.charAt(0)=='n' && response.body.charAt(1)=='u'){
             // we received a 'no update'
@@ -677,7 +688,7 @@ bool update_ids(bool forced){
         }
     }
         
-    last_key_update_ms=now;
+
     
     // clear all existing keys and then, import keys from request
     keys_available=0;
@@ -692,7 +703,7 @@ bool update_ids(bool forced){
         if(response.body.charAt(i)==','){
             if(current_key_pos<MAX_KEYS){
 
-                Log.info("write key: %u" , current_key_pos*4+3);
+                Log.trace("write key: %u" , current_key_pos*4+3);
 
                 // store to EEPROM
                 EEPROM.update(current_key_pos*4+0, (keys[current_key_pos]>>24)&0xff);

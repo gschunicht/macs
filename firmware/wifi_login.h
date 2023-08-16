@@ -2,7 +2,7 @@
 
 bool set_update_login(LED *green, LED *red);
 bool set_macs_login(LED *green, LED *red);
-bool set_login(LED *green, LED *red, uint8_t mode);
+bool set_wifi_login(LED *green, LED *red, uint8_t mode);
 bool save_wifi_config(uint8_t id,String SSID,String pw,uint8_t type);
 
 bool get_eeprom_wifi_config(uint8_t id, String *_SSID, String *_pw, int *_type);

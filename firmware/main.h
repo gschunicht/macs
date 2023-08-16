@@ -15,4 +15,4 @@ bool validate_tag(uint8_t *buf,uint32_t *tag);
 void create_report(uint8_t event,uint32_t badge,uint32_t extrainfo);
 bool tag_found(uint8_t *buf,uint32_t *tag);
 bool access_test(uint32_t tag);
-bool check_db_for_one_tag(int currentTag);
+bool check_db_for_one_tag(uint32_t currentTag);
